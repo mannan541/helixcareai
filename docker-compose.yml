@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: helixcareai-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: helixcareai
+    ports:
+      - "5432:5432"
+    volumes:
+      - helixcareai_pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d helixcareai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  helixcareai_pgdata:
