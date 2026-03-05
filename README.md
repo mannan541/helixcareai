@@ -103,6 +103,53 @@ flutter run
 - `./scripts/run-backend.sh` — Start backend (dev)
 - `./scripts/run-mobile.sh` — Run Flutter app
 
+## Branches & CI/CD
+
+| Branch | Purpose | Vercel |
+|--------|---------|--------|
+| **main** | Production | Deploys to **production** (production URL) |
+| **dev** | Testing / staging | Deploys to **preview** (unique preview URL per commit) |
+
+- **CI** (`.github/workflows/ci.yml`): On every push/PR to `main` or `dev` — backend build, mobile `flutter analyze`.
+- **Deploy** (`.github/workflows/deploy-vercel.yml`): On push to `main` → Vercel production; on push to `dev` → Vercel preview.
+
+To create and use the dev branch:
+
+```bash
+git checkout -b dev
+git push -u origin dev
+```
+
+**GitHub Secrets** (Repo → Settings → Secrets and variables → Actions) for Vercel deploy:
+
+| Secret | How to get it |
+|--------|----------------|
+| `VERCEL_TOKEN` | [Vercel Account → Tokens](https://vercel.com/account/tokens) — create a token |
+| `VERCEL_ORG_ID` | After `cd backend && npx vercel link`, from `.vercel/project.json` or [Vercel Dashboard → Project Settings → General](https://vercel.com/docs/concepts/projects/overview#project-id) |
+| `VERCEL_PROJECT_ID` | Same as above (in `.vercel/project.json` after `vercel link`) |
+
+Link the backend once locally so the project exists on Vercel and you have the IDs: `cd backend && npx vercel link` (choose your org and create/link the project).
+
+## Deploy backend to Vercel (manual)
+
+From the `backend` directory:
+
+```bash
+cd backend
+npx vercel
+```
+
+Set these **Environment Variables** in the Vercel project (Dashboard → Project → Settings → Environment Variables):
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string (use a serverless-friendly DB e.g. [Neon](https://neon.tech), [Vercel Postgres](https://vercel.com/storage/postgres), or [Supabase](https://supabase.com)) |
+| `JWT_SECRET` | Strong secret for signing tokens |
+| `OPENAI_API_KEY` | OpenAI API key (for RAG chat) |
+| `EMBEDDING_DIMENSION` | `1536` (for text-embedding-3-small) |
+
+After deploy, the API base URL is `https://<your-project>.vercel.app`. Use it as `API_BASE_URL` in the mobile app.
+
 ## License
 
 Proprietary — HelixCareAI
