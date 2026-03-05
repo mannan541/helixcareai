@@ -79,7 +79,12 @@ jobs:
 
       - name: Build Flutter web
         working-directory: mobile
-        run: flutter build web --release
+        run: |
+          # Use production API base URL for web build
+          if [ -f .env.production ]; then
+            cp .env.production .env
+          fi
+          flutter build web --release
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest

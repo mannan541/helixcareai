@@ -40,7 +40,7 @@ cd database && psql -h localhost -U postgres -d helixcareai -f schema.sql
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env: DATABASE_URL, JWT_SECRET, OPENAI_API_KEY (for RAG)
+# Edit .env: DATABASE_URL (local Postgres), JWT_SECRET, OPENAI_API_KEY (for RAG)
 npm install
 npm run build
 npm run start
@@ -53,8 +53,9 @@ API base URL: `http://localhost:3000`
 
 ```bash
 cd mobile
+# Local dev: copy example and point to local backend
 cp .env.example .env
-# Set API_BASE_URL to your backend URL (e.g. http://10.0.2.2:3000 for Android emulator)
+# For local web/dev, API_BASE_URL is usually http://localhost:3000
 flutter pub get
 flutter run
 ```
@@ -167,6 +168,26 @@ You need **two Vercel projects**: one for the API (backend) and one for the web 
 **Your current backend IDs (same org for frontend)**  
 From your existing backend link, **Org ID** is: `team_aumvi1YqIjR9fk4koGCgW5E9`. Use this for `VERCEL_ORG_ID` in GitHub. The **new** frontend project will have a different **Project ID** — get it from the dashboard (Option A) or from `mobile/.vercel/project.json` after `vercel link` (Option B).
 
+## Database: Vercel Postgres (recommended)
+
+The app uses **PostgreSQL with pgvector** (for RAG embeddings). Use a Postgres integration from the Vercel Marketplace so the backend gets a connection string automatically.
+
+1. **Add Postgres to your backend project**
+   - Open [Vercel Dashboard](https://vercel.com) → your **backend** project (e.g. hlixacareai) → **Storage** tab (or **Integrations**).
+   - Click **Create Database** / **Add Integration** and choose a **Postgres** provider (e.g. [Neon](https://vercel.com/marketplace/neon) — recommended; Vercel Postgres was migrated to Neon).
+   - Connect it to this project. Vercel will inject **`POSTGRES_URL`** (and optionally `POSTGRES_URL_NON_POOLING`) into the project. The backend reads `POSTGRES_URL` when set.
+
+2. **Run the schema**
+   - After the database is created, run the schema once. From the integration’s dashboard, copy the connection string (use the **non-pooling** URL if you need to run migrations that use extensions like pgvector).
+   - Locally:
+     ```bash
+     psql "<paste-connection-string>" -f database/schema.sql
+     ```
+   - Or from the provider’s SQL editor (Neon, etc.), run the contents of `database/schema.sql`.
+
+3. **Local development**
+   - In `backend/.env` set `DATABASE_URL` to your local Postgres (e.g. Docker) or the same Neon/Vercel DB URL. The app uses `POSTGRES_URL` on Vercel and `DATABASE_URL` locally.
+
 ## Deploy backend to Vercel (manual)
 
 From the `backend` directory:
@@ -180,7 +201,7 @@ Set these **Environment Variables** in the Vercel project (Dashboard → Project
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (use a serverless-friendly DB e.g. [Neon](https://neon.tech), [Vercel Postgres](https://vercel.com/storage/postgres), or [Supabase](https://supabase.com)) |
+| *(DB)* | Use **Vercel Postgres** (above): add Postgres from Marketplace; **`POSTGRES_URL`** is injected. No need to set `DATABASE_URL` on Vercel. |
 | `JWT_SECRET` | Strong secret for signing tokens |
 | `OPENAI_API_KEY` | OpenAI API key (for RAG chat) |
 | `EMBEDDING_DIMENSION` | `1536` (for text-embedding-3-small) |
