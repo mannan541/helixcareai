@@ -110,8 +110,8 @@ flutter run
 | **main** | Production | Deploys to **production** (production URL) |
 | **dev** | Testing / staging | Deploys to **preview** (unique preview URL per commit) |
 
-- **CI** (`.github/workflows/ci.yml`): On every push/PR to `main` or `dev` — backend build, mobile `flutter analyze`.
-- **Deploy** (`.github/workflows/deploy-vercel.yml`): On push to `main` → Vercel production; on push to `dev` → Vercel preview.
+- **CI** (`.github/workflows/ci.yml`): On every push/PR to `main` or `dev` — **backend only** (install + build).
+- **Deploy** (`.github/workflows/deploy-vercel.yml`): On push to `main` or `dev` — **backend** (API) and **frontend** (Flutter web build) both deploy to Vercel. `main` → production; `dev` → preview.
 
 To create and use the dev branch:
 
@@ -125,10 +125,11 @@ git push -u origin dev
 | Secret | How to get it |
 |--------|----------------|
 | `VERCEL_TOKEN` | [Vercel Account → Tokens](https://vercel.com/account/tokens) — create a token |
-| `VERCEL_ORG_ID` | After `cd backend && npx vercel link`, from `.vercel/project.json` or [Vercel Dashboard → Project Settings → General](https://vercel.com/docs/concepts/projects/overview#project-id) |
-| `VERCEL_PROJECT_ID` | Same as above (in `.vercel/project.json` after `vercel link`) |
+| `VERCEL_ORG_ID` | From [Vercel Dashboard](https://vercel.com) → your team/org → Settings → General, or from `.vercel/project.json` after `vercel link` |
+| `VERCEL_PROJECT_ID` | **Backend** project ID. After `cd backend && npx vercel link`, see `.vercel/project.json` (or Project Settings → General) |
+| `VERCEL_FRONTEND_PROJECT_ID` | **Frontend** (Flutter web) project ID. Create a second Vercel project (e.g. same repo, root dir `mobile`, or “Other” framework), then copy its Project ID from Settings → General |
 
-Link the backend once locally so the project exists on Vercel and you have the IDs: `cd backend && npx vercel link` (choose your org and create/link the project).
+You need **two Vercel projects**: one for the API (backend) and one for the web app (mobile). Link backend once: `cd backend && npx vercel link`. Create the frontend project in the dashboard (same Git repo, root directory = `mobile`) and add its ID as `VERCEL_FRONTEND_PROJECT_ID`.
 
 ## Deploy backend to Vercel (manual)
 

@@ -1,3 +1,6 @@
+# Vercel (frontend deploy link)
+.vercel/
+
 # Miscellaneous
 *.class
 *.log
