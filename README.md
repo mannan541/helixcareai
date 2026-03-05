@@ -129,7 +129,43 @@ git push -u origin dev
 | `VERCEL_PROJECT_ID` | **Backend** project ID. After `cd backend && npx vercel link`, see `.vercel/project.json` (or Project Settings → General) |
 | `VERCEL_FRONTEND_PROJECT_ID` | **Frontend** (Flutter web) project ID. Create a second Vercel project (e.g. same repo, root dir `mobile`, or “Other” framework), then copy its Project ID from Settings → General |
 
-You need **two Vercel projects**: one for the API (backend) and one for the web app (mobile). Link backend once: `cd backend && npx vercel link`. Create the frontend project in the dashboard (same Git repo, root directory = `mobile`) and add its ID as `VERCEL_FRONTEND_PROJECT_ID`.
+You need **two Vercel projects**: one for the API (backend) and one for the web app (mobile). See below to link mobile.
+
+### Link mobile (Flutter web) to Vercel — create new project & get IDs
+
+**Option A — Vercel Dashboard (recommended)**
+
+1. Go to [vercel.com/new](https://vercel.com/new) and sign in.
+2. **Import** your Git repository (e.g. `mannan541/helixcareai`).
+3. Before deploying, click **Edit** next to “Root Directory” and set it to **`mobile`**.
+4. **Framework Preset:** choose **Other** (we build Flutter web in CI; Vercel won’t run the build here).
+5. **Build Command:** leave empty (or `echo "Built in CI"`). **Output Directory:** leave default (CI uses prebuilt output).
+6. Click **Deploy**. The first deploy may fail; that’s OK.
+7. Get the IDs:
+   - Open the new project → **Settings** → **General**.
+   - Copy **Project ID** (e.g. `prj_xxxxx`) → use as GitHub secret **`VERCEL_FRONTEND_PROJECT_ID`**.
+   - **Org ID:** same as backend. In the left sidebar go to your **Team/Account** → **Settings** → **General** → copy **Team ID** or **User ID** (e.g. `team_xxxx` or `user_xxxx`). You already have this if backend is linked (see your backend `project.json`).
+
+**Option B — Vercel CLI (creates project and writes IDs locally)**
+
+1. In a terminal, from the **repo root**:
+   ```bash
+   cd mobile
+   npx vercel link
+   ```
+2. When asked:
+   - **Set up and deploy?** → **Y**
+   - **Which scope?** → choose the same team/account as your backend.
+   - **Link to existing project?** → **N** (we want a new project).
+   - **What’s your project’s name?** → e.g. `helixcareai-web` or `hlixcareai-mobile`.
+3. After linking, the CLI creates `mobile/.vercel/project.json`. To see your **Project ID** and **Org ID**:
+   ```bash
+   cat mobile/.vercel/project.json
+   ```
+4. Add **Project ID** to GitHub as **`VERCEL_FRONTEND_PROJECT_ID`**. Use the same **Org ID** as backend for **`VERCEL_ORG_ID`** (if not set already).
+
+**Your current backend IDs (same org for frontend)**  
+From your existing backend link, **Org ID** is: `team_aumvi1YqIjR9fk4koGCgW5E9`. Use this for `VERCEL_ORG_ID` in GitHub. The **new** frontend project will have a different **Project ID** — get it from the dashboard (Option A) or from `mobile/.vercel/project.json` after `vercel link` (Option B).
 
 ## Deploy backend to Vercel (manual)
 
