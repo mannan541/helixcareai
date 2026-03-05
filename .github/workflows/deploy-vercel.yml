@@ -73,18 +73,20 @@ jobs:
           channel: "stable"
           cache: true
 
+      - name: Set production env for build
+        working-directory: mobile
+        run: |
+          # Ensure .env exists for asset bundle; use production API URL
+          cp .env.production .env 2>/dev/null || true
+          if [ ! -f .env ]; then echo 'API_BASE_URL=https://hlixacareai.vercel.app' > .env; fi
+
       - name: Install dependencies
         working-directory: mobile
         run: flutter pub get
 
       - name: Build Flutter web
         working-directory: mobile
-        run: |
-          # Use production API base URL for web build
-          if [ -f .env.production ]; then
-            cp .env.production .env
-          fi
-          flutter build web --release
+        run: flutter build web --release
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -106,7 +108,6 @@ jobs:
         run: |
           mkdir -p .vercel/output/static
           cp -r build/web/* .vercel/output/static/
-          mkdir -p .vercel/output
           echo '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
 
       - name: Deploy frontend to Vercel

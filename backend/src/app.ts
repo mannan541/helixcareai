@@ -18,6 +18,8 @@ app.use('/api/sessions', sessionsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
+app.get('/', (_req, res) => res.json({ name: 'HelixCareAI API', status: 'ok', docs: '/health' }));
+app.get('/api', (_req, res) => res.json({ name: 'HelixCareAI API', status: 'ok', docs: '/health' }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use(errorHandler);

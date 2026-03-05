@@ -208,6 +208,17 @@ Set these **Environment Variables** in the Vercel project (Dashboard → Project
 
 After deploy, the API base URL is `https://<your-project>.vercel.app`. Use it as `API_BASE_URL` in the mobile app.
 
+### Production (Vercel) checklist
+
+**Backend project** (e.g. hlixacareai): In **Settings → Environment Variables**, set for **Production** (and Preview if needed):
+
+- **POSTGRES_URL** — Injected automatically if you added Neon/Postgres from Storage/Integrations. Otherwise add the connection string.
+- **JWT_SECRET** — A long random string (e.g. from a password generator).
+- **OPENAI_API_KEY** — Your OpenAI API key (for RAG/chat).
+- **EMBEDDING_DIMENSION** — `1536`.
+
+**Frontend project** (e.g. helixcareaifrontend): No env vars required for the app to run; the production API URL is baked in at build time from `mobile/.env.production`. Optionally set **API_BASE_URL** in Vercel if you ever build from the dashboard.
+
 ## License
 
 Proprietary — HelixCareAI
