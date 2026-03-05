@@ -121,7 +121,7 @@ git checkout -b dev
 git push -u origin dev
 ```
 
-**GitHub Secrets** (Repo → Settings → Secrets and variables → Actions) for Vercel deploy:
+**GitHub Secrets** (Repo → **Settings** → **Secrets and variables** → **Actions** → **Repository secrets**) for Vercel deploy:
 
 | Secret | How to get it |
 |--------|----------------|
