@@ -62,9 +62,15 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend (Flutter Web)
     runs-on: ubuntu-latest
-    if: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID != '' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check frontend Vercel secret
+        run: |
+          if [ -z "${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}" ]; then
+            echo "::error::Add VERCEL_FRONTEND_PROJECT_ID to repo Secrets (Settings → Secrets and variables → Actions). Get it from Vercel → frontend project → Settings → General → Project ID."
+            exit 1
+          fi
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2

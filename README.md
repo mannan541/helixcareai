@@ -128,7 +128,7 @@ git push -u origin dev
 | `VERCEL_TOKEN` | [Vercel Account → Tokens](https://vercel.com/account/tokens) — create a token |
 | `VERCEL_ORG_ID` | From [Vercel Dashboard](https://vercel.com) → your team/org → Settings → General, or from `.vercel/project.json` after `vercel link` |
 | `VERCEL_PROJECT_ID` | **Backend** project ID. After `cd backend && npx vercel link`, see `.vercel/project.json` (or Project Settings → General) |
-| `VERCEL_FRONTEND_PROJECT_ID` | **Frontend** (Flutter web) project ID. Create a second Vercel project (e.g. same repo, root dir `mobile`, or “Other” framework), then copy its Project ID from Settings → General |
+| `VERCEL_FRONTEND_PROJECT_ID` | **Frontend** (Flutter web) project ID. Create a second Vercel project (e.g. same repo, root dir `mobile`, or “Other” framework), then copy its Project ID from Settings → General. Required for the "Deploy Frontend" job — without it that job fails and only the backend deploy runs. |
 
 You need **two Vercel projects**: one for the API (backend) and one for the web app (mobile). See below to link mobile.
 
