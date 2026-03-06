@@ -25,15 +25,29 @@ Production-ready monorepo for the HelixCareAI autism therapy management platform
 
 ### 1. Database
 
-```bash
-# Start PostgreSQL with pgvector
-docker compose up -d
+The backend needs PostgreSQL (with pgvector). Use either **Docker** or a **remote DB (e.g. Neon)**.
 
-# Run migrations (from project root)
-cd database && psql -h localhost -U postgres -d helixcareai -f schema.sql
-# Or use the init script if using Docker default credentials
+**Option A — Docker (local Postgres)**
+
+```bash
+# From project root
 ./scripts/init-db.sh
 ```
+
+Requires Docker. Starts Postgres on port 5432 and runs `database/schema.sql`.
+
+**Option B — Neon (or other remote) for local dev**
+
+If you already use Neon for Vercel, you can use the same DB locally:
+
+1. In [Neon](https://neon.tech) (or your provider), copy the **connection string** (use the pooled one if offered).
+2. In `backend/.env` set:
+   ```env
+   DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
+   ```
+3. Run the schema once (Neon SQL Editor or `psql "your-connection-string" -f database/schema.sql`).
+
+**If you see `ECONNREFUSED 127.0.0.1:5432`** — nothing is listening on port 5432. Start Docker Postgres (Option A) or set `DATABASE_URL` in `backend/.env` to a remote DB (Option B), then restart the backend.
 
 ### 2. Backend
 
@@ -47,7 +61,8 @@ npm run start
 # Dev: npm run dev
 ```
 
-API base URL: `http://localhost:3000`
+API base URL: `http://localhost:3000`  
+**API docs (Swagger):** [http://localhost:3000/api-docs](http://localhost:3000/api-docs) — test auth, children, sessions, chat, analytics from the browser.
 
 ### 3. Mobile
 
@@ -103,6 +118,8 @@ flutter run
 - `./scripts/init-db.sh` — Create DB and run schema (requires Docker)
 - `./scripts/run-backend.sh` — Start backend (dev)
 - `./scripts/run-mobile.sh` — Run Flutter app
+- **Backend:** `npm run db:schema` — Apply `database/schema.sql`
+- **Backend:** `npm run db:hard-delete` — Permanently remove records that were soft-deleted more than 7 days ago. Schedule daily (e.g. cron) if you use soft deletes.
 
 ## Branches & CI/CD
 

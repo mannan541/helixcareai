@@ -1,8 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../../children/domain/child_entity.dart';
 import '../data/analytics_repository.dart';
+
+String _formatSessionDate(String sessionDate) {
+  try {
+    final dt = DateTime.parse(sessionDate);
+    final hasTime = sessionDate.contains('T') || sessionDate.contains(' ');
+    if (hasTime && (dt.hour != 0 || dt.minute != 0)) {
+      return DateFormat('MMMM d, yyyy h.mma').format(dt);
+    }
+    return DateFormat('MMMM d, yyyy').format(dt);
+  } catch (_) {
+    return sessionDate;
+  }
+}
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -100,10 +114,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
                           if (value.toInt() >= 0 && value.toInt() < sessions.length) {
-                            final d = sessions[value.toInt()].sessionDate;
+                            final formatted = _formatSessionDate(sessions[value.toInt()].sessionDate);
                             return Padding(
                               padding: const EdgeInsets.only(top: 8),
-                              child: Text(d.length >= 10 ? d.substring(5, 10) : d, style: const TextStyle(fontSize: 10)),
+                              child: Text(
+                                formatted.length > 14 ? '${formatted.substring(0, 12)}…' : formatted,
+                                style: const TextStyle(fontSize: 10),
+                              ),
                             );
                           }
                           return const SizedBox();
@@ -154,7 +171,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.sessionDate, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(_formatSessionDate(s.sessionDate), style: const TextStyle(fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,

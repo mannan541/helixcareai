@@ -8,11 +8,16 @@ class ChildrenRepository {
 
   ChildrenRepository(this._api);
 
-  Future<List<ChildEntity>> list() async {
+  Future<ChildrenListResponse> list({int limit = 20, int offset = 0}) async {
     try {
-      final data = await _api.get<Map<String, dynamic>>('/api/children');
+      final data = await _api.get<Map<String, dynamic>>(
+        '/api/children',
+        queryParameters: {'limit': limit, 'offset': offset},
+      );
       final list = data!['children'] as List<dynamic>? ?? [];
-      return list.map((e) => _fromJson(e as Map<String, dynamic>)).toList();
+      final total = data['total'] as int? ?? list.length;
+      final children = list.map((e) => _fromJson(e as Map<String, dynamic>)).toList();
+      return ChildrenListResponse(children: children, total: total);
     } on DioException catch (e) {
       throw _handle(e);
     }
@@ -32,6 +37,8 @@ class ChildrenRepository {
     required String lastName,
     String? dateOfBirth,
     String? notes,
+    String? diagnosis,
+    String? referredBy,
   }) async {
     try {
       final data = await _api.post<Map<String, dynamic>>('/api/children', {
@@ -39,6 +46,8 @@ class ChildrenRepository {
         'lastName': lastName,
         if (dateOfBirth != null) 'dateOfBirth': dateOfBirth,
         if (notes != null) 'notes': notes,
+        if (diagnosis != null) 'diagnosis': diagnosis,
+        if (referredBy != null) 'referredBy': referredBy,
       });
       return _fromJson(data!['child'] as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -52,6 +61,8 @@ class ChildrenRepository {
     String? lastName,
     String? dateOfBirth,
     String? notes,
+    String? diagnosis,
+    String? referredBy,
   }) async {
     try {
       final body = <String, dynamic>{};
@@ -59,6 +70,8 @@ class ChildrenRepository {
       if (lastName != null) body['lastName'] = lastName;
       if (dateOfBirth != null) body['dateOfBirth'] = dateOfBirth;
       if (notes != null) body['notes'] = notes;
+      if (diagnosis != null) body['diagnosis'] = diagnosis;
+      if (referredBy != null) body['referredBy'] = referredBy;
       final data = await _api.patch<Map<String, dynamic>>('/api/children/$id', body);
       return _fromJson(data!['child'] as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -82,6 +95,8 @@ class ChildrenRepository {
       lastName: j['lastName'] as String,
       dateOfBirth: j['dateOfBirth'] as String?,
       notes: j['notes'] as String?,
+      diagnosis: j['diagnosis'] as String?,
+      referredBy: j['referredBy'] as String?,
       createdAt: DateTime.parse(j['createdAt'] as String),
       updatedAt: DateTime.parse(j['updatedAt'] as String),
     );
@@ -94,4 +109,10 @@ class ChildrenRepository {
     if (code == 403) return AppException(msg, 403);
     return AppException(msg, code);
   }
+}
+
+class ChildrenListResponse {
+  ChildrenListResponse({required this.children, required this.total});
+  final List<ChildEntity> children;
+  final int total;
 }

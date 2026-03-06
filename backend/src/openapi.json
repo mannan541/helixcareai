@@ -1,0 +1,141 @@
+{
+  "openapi": "3.0.0",
+  "info": { "title": "HelixCareAI API", "version": "1.0.0", "description": "Autism therapy management API" },
+  "servers": [
+    { "url": "http://localhost:3000", "description": "Local" },
+    { "url": "https://hlixacareai.vercel.app", "description": "Production" }
+  ],
+  "paths": {
+    "/health": {
+      "get": { "summary": "Health check", "tags": ["Health"], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/auth/register": {
+      "post": {
+        "summary": "Register",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password", "fullName", "role"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 8 },
+                  "fullName": { "type": "string" },
+                  "role": { "type": "string", "enum": ["admin", "therapist", "parent"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" }, "409": { "description": "Email already registered" } }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Login",
+        "tags": ["Auth"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" }, "401": { "description": "Invalid credentials" } }
+      }
+    },
+    "/api/auth/me": {
+      "get": { "summary": "Current user", "tags": ["Auth"], "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" }, "401": { "description": "Unauthorized" } } }
+    },
+    "/api/children": {
+      "get": { "summary": "List children", "tags": ["Children"], "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "OK" } } },
+      "post": {
+        "summary": "Create child",
+        "tags": ["Children"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["firstName", "lastName"],
+                "properties": { "firstName": { "type": "string" }, "lastName": { "type": "string" }, "dateOfBirth": { "type": "string", "format": "date" }, "notes": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/children/{id}": {
+      "get": { "summary": "Get child", "tags": ["Children"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } },
+      "patch": { "summary": "Update child", "tags": ["Children"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } },
+      "delete": { "summary": "Delete child", "tags": ["Children"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/sessions": {
+      "post": {
+        "summary": "Create session",
+        "tags": ["Sessions"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["childId", "sessionDate"],
+                "properties": { "childId": { "type": "string", "format": "uuid" }, "sessionDate": { "type": "string", "format": "date" }, "durationMinutes": { "type": "integer", "minimum": 0 }, "notesText": { "type": "string" }, "structuredMetrics": { "type": "object" } }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/api/sessions/child/{childId}": {
+      "get": { "summary": "List sessions by child", "tags": ["Sessions"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "childId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/sessions/{id}": {
+      "get": { "summary": "Get session", "tags": ["Sessions"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } },
+      "patch": { "summary": "Update session", "tags": ["Sessions"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } },
+      "delete": { "summary": "Delete session", "tags": ["Sessions"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/chat/ask": {
+      "post": {
+        "summary": "Ask RAG question",
+        "tags": ["Chat"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["childId", "question"],
+                "properties": { "childId": { "type": "string", "format": "uuid" }, "question": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/chat/history/{childId}": {
+      "get": { "summary": "Chat history", "tags": ["Chat"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "childId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } }
+    },
+    "/api/analytics/child/{childId}": {
+      "get": { "summary": "Analytics for child", "tags": ["Analytics"], "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "childId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Token from login/register" }
+    }
+  }
+}

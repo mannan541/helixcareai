@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
+import 'child_detail_screen.dart';
 import 'children_bloc.dart';
 
 class ChildrenListScreen extends StatelessWidget {
@@ -67,8 +68,21 @@ class _ChildrenListView extends StatelessWidget {
               children: [
                 ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: list.length,
+                  itemCount: list.length + (state.hasMore ? 1 : 0),
                   itemBuilder: (context, i) {
+                    if (i == list.length) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: state.isLoadingMore
+                              ? const CircularProgressIndicator()
+                              : TextButton(
+                                  onPressed: () => context.read<ChildrenBloc>().add(const ChildrenLoadRequested(loadMore: true)),
+                                  child: Text('Load more (${list.length} of ${state.total})'),
+                                ),
+                        ),
+                      );
+                    }
                     final c = list[i];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -76,12 +90,18 @@ class _ChildrenListView extends StatelessWidget {
                         title: Text(c.fullName),
                         subtitle: c.dateOfBirth != null ? Text('DOB: ${c.dateOfBirth}') : null,
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).pushNamed('/child_detail', arguments: c),
+                        onTap: () => Navigator.of(context).pushNamed(
+                          '/child_detail',
+                          arguments: ChildDetailArgs(
+                            child: c,
+                            childrenBloc: context.read<ChildrenBloc>(),
+                          ),
+                        ),
                       ),
                     );
                   },
                 ),
-                if (state.isLoading) const Positioned.fill(child: ColoredBox(color: Color(0x20000000), child: Center(child: CircularProgressIndicator()))),
+                if (state.isLoading && list.isEmpty) const Positioned.fill(child: ColoredBox(color: Color(0x20000000), child: Center(child: CircularProgressIndicator()))),
               ],
             );
           }
@@ -89,12 +109,14 @@ class _ChildrenListView extends StatelessWidget {
             appBar: AppBar(
               title: const Text('Children'),
               actions: [
+                _AddUserButton(),
+                IconButton(
+                  icon: const Icon(Icons.person),
+                  onPressed: () => Navigator.of(context).pushNamed('/edit_profile'),
+                ),
                 IconButton(
                   icon: const Icon(Icons.logout),
-                  onPressed: () {
-                    authRepository.setToken(null);
-                    Navigator.of(context).pushReplacementNamed('/login');
-                  },
+                  onPressed: () => _confirmLogout(context),
                 ),
               ],
             ),
@@ -110,17 +132,38 @@ class _ChildrenListView extends StatelessWidget {
       );
   }
 
+  void _confirmLogout(BuildContext context) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out'),
+        content: const Text('Are you sure you want to log out?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Log out')),
+        ],
+      ),
+    ).then((confirmed) {
+      if (confirmed == true) {
+        authRepository.setToken(null);
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
+    });
+  }
+
   void _showAddChild(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _AddChildSheet(
-        onSubmit: (firstName, lastName, dateOfBirth, notes) {
+        onSubmit: (firstName, lastName, dateOfBirth, notes, diagnosis, referredBy) {
           context.read<ChildrenBloc>().add(ChildrenCreateRequested(
                 firstName: firstName,
                 lastName: lastName,
                 dateOfBirth: dateOfBirth,
                 notes: notes,
+                diagnosis: diagnosis,
+                referredBy: referredBy,
               ));
           Navigator.pop(ctx);
         },
@@ -129,8 +172,35 @@ class _ChildrenListView extends StatelessWidget {
   }
 }
 
+class _AddUserButton extends StatefulWidget {
+  @override
+  State<_AddUserButton> createState() => _AddUserButtonState();
+}
+
+class _AddUserButtonState extends State<_AddUserButton> {
+  bool? _isAdmin;
+
+  @override
+  void initState() {
+    super.initState();
+    authRepository.me().then((u) {
+      if (mounted) setState(() => _isAdmin = u?.isAdmin);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isAdmin != true) return const SizedBox.shrink();
+    return IconButton(
+      icon: const Icon(Icons.person_add),
+      tooltip: 'Add therapist/parent',
+      onPressed: () => Navigator.of(context).pushNamed('/add_user'),
+    );
+  }
+}
+
 class _AddChildSheet extends StatefulWidget {
-  final void Function(String firstName, String lastName, String? dateOfBirth, String? notes) onSubmit;
+  final void Function(String firstName, String lastName, String? dateOfBirth, String? notes, String? diagnosis, String? referredBy) onSubmit;
 
   const _AddChildSheet({required this.onSubmit});
 
@@ -142,7 +212,19 @@ class _AddChildSheetState extends State<_AddChildSheet> {
   final _fn = TextEditingController();
   final _ln = TextEditingController();
   final _notes = TextEditingController();
-  String? _dob;
+  final _diagnosis = TextEditingController();
+  final _referredBy = TextEditingController();
+  DateTime? _dob;
+
+  @override
+  void dispose() {
+    _fn.dispose();
+    _ln.dispose();
+    _notes.dispose();
+    _diagnosis.dispose();
+    _referredBy.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,12 +242,45 @@ class _AddChildSheetState extends State<_AddChildSheet> {
             const SizedBox(height: 12),
             TextField(controller: _ln, decoration: const InputDecoration(labelText: 'Last name')),
             const SizedBox(height: 12),
+            ListTile(
+              title: Text(_dob == null ? 'Date of birth (optional)' : 'DOB: ${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _dob ?? DateTime.now(),
+                  firstDate: DateTime(1990),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) setState(() => _dob = picked);
+              },
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _diagnosis,
+              decoration: const InputDecoration(labelText: 'Diagnosis (optional)', hintText: 'e.g. ASD'),
+              maxLines: 1,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _referredBy,
+              decoration: const InputDecoration(labelText: 'Referred by (optional)', hintText: 'e.g. Dr. Smith'),
+            ),
+            const SizedBox(height: 12),
             TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notes'), maxLines: 2),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: () {
                 if (_fn.text.trim().isEmpty || _ln.text.trim().isEmpty) return;
-                widget.onSubmit(_fn.text.trim(), _ln.text.trim(), _dob, _notes.text.trim().isEmpty ? null : _notes.text.trim());
+                final dobStr = _dob != null ? '${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}' : null;
+                widget.onSubmit(
+                  _fn.text.trim(),
+                  _ln.text.trim(),
+                  dobStr,
+                  _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                  _diagnosis.text.trim().isEmpty ? null : _diagnosis.text.trim(),
+                  _referredBy.text.trim().isEmpty ? null : _referredBy.text.trim(),
+                );
               },
               child: const Text('Save'),
             ),

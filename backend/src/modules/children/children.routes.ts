@@ -22,6 +22,8 @@ router.post(
     body('lastName').trim().notEmpty(),
     body('dateOfBirth').optional().isISO8601(),
     body('notes').optional().isString(),
+    body('diagnosis').optional().isString(),
+    body('referredBy').optional().isString(),
   ]),
   childrenController.create
 );
@@ -34,6 +36,8 @@ router.patch(
     body('lastName').optional().trim().notEmpty(),
     body('dateOfBirth').optional().isISO8601(),
     body('notes').optional().isString(),
+    body('diagnosis').optional().isString(),
+    body('referredBy').optional().isString(),
   ]),
   childrenController.update
 );

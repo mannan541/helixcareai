@@ -3,6 +3,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+if ! command -v docker &>/dev/null; then
+  echo "Docker is not installed or not in PATH."
+  echo ""
+  echo "You can either:"
+  echo "  1. Install Docker Desktop: https://docs.docker.com/get-docker/"
+  echo "  2. Use a remote DB (no Docker): set DATABASE_URL in backend/.env to your Neon (or other) connection string. See README → Database → Option B."
+  exit 1
+fi
+
 echo "Starting PostgreSQL (pgvector)..."
 cd "$ROOT_DIR" && docker compose up -d postgres
 

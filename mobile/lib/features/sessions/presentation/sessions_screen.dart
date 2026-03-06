@@ -3,9 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../domain/session_entity.dart';
+import '../data/sessions_repository.dart';
 import '../../children/domain/child_entity.dart';
 import 'sessions_bloc.dart';
 import 'session_form_screen.dart';
+import 'session_detail_screen.dart';
 
 class SessionsScreen extends StatelessWidget {
   const SessionsScreen({super.key});
@@ -20,15 +22,33 @@ class SessionsScreen extends StatelessWidget {
   }
 }
 
-class _SessionsView extends StatelessWidget {
+class _SessionsView extends StatefulWidget {
   const _SessionsView({required this.child});
 
   final ChildEntity child;
 
   @override
+  State<_SessionsView> createState() => _SessionsViewState();
+}
+
+class _SessionsViewState extends State<_SessionsView> {
+  bool? _canEdit;
+
+  @override
+  void initState() {
+    super.initState();
+    authRepository.me().then((user) {
+      if (mounted) setState(() {
+        _canEdit = user != null && (user.isAdmin || user.isTherapist);
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final canEdit = _canEdit ?? true;
     return Scaffold(
-      appBar: AppBar(title: Text('Sessions — ${child.fullName}')),
+      appBar: AppBar(title: Text('Sessions — ${widget.child.fullName}')),
       body: BlocConsumer<SessionsBloc, SessionsState>(
         listener: (context, state) {
           if (state.error != null) {
@@ -46,7 +66,7 @@ class _SessionsView extends StatelessWidget {
                 children: [
                   Text(state.error!, textAlign: TextAlign.center),
                   TextButton(
-                    onPressed: () => context.read<SessionsBloc>().add(SessionsLoadRequested(child.id)),
+                    onPressed: () => context.read<SessionsBloc>().add(SessionsLoadRequested(widget.child.id)),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -62,12 +82,14 @@ class _SessionsView extends StatelessWidget {
                   const Icon(Icons.event_note, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
                   const Text('No sessions yet'),
-                  const SizedBox(height: 8),
-                  FilledButton.icon(
-                    onPressed: () => _openSessionForm(context, null),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Log session'),
-                  ),
+                  if (canEdit) ...[
+                    const SizedBox(height: 8),
+                    FilledButton.icon(
+                      onPressed: () => _openSessionForm(context, null),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Log session'),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -76,8 +98,21 @@ class _SessionsView extends StatelessWidget {
             children: [
               ListView.builder(
                 padding: const EdgeInsets.all(16),
-                itemCount: list.length,
+                itemCount: list.length + (state.hasMore ? 1 : 0),
                 itemBuilder: (context, i) {
+                  if (i == list.length) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: state.isLoadingMore
+                            ? const CircularProgressIndicator()
+                            : TextButton(
+                                onPressed: () => context.read<SessionsBloc>().add(SessionsLoadRequested(widget.child.id, loadMore: true)),
+                                child: Text('Load more (${list.length} of ${state.total})'),
+                              ),
+                      ),
+                    );
+                  }
                   final s = list[i];
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -90,12 +125,12 @@ class _SessionsView extends StatelessWidget {
                         ].join(' • '),
                       ),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _openSessionForm(context, s),
+                      onTap: () => _openSessionDetailOrForm(context, s, canEdit),
                     ),
                   );
                 },
               ),
-              if (state.isLoading)
+              if (state.isLoading && list.isEmpty)
                 const Positioned.fill(
                   child: ColoredBox(
                     color: Color(0x20000000),
@@ -106,9 +141,29 @@ class _SessionsView extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openSessionForm(context, null),
-        child: const Icon(Icons.add),
+      floatingActionButton: canEdit
+          ? FloatingActionButton(
+              onPressed: () => _openSessionForm(context, null),
+              child: const Icon(Icons.add),
+            )
+          : null,
+    );
+  }
+
+  void _openSessionDetailOrForm(BuildContext context, SessionEntity session, bool canEdit) {
+    final bloc = context.read<SessionsBloc>();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => BlocProvider.value(
+          value: bloc,
+          child: SessionDetailScreen(
+            child: widget.child,
+            session: session,
+            canEdit: canEdit,
+            canAddNotes: !canEdit,
+            onSaved: () => bloc.add(SessionsLoadRequested(widget.child.id)),
+          ),
+        ),
       ),
     );
   }
@@ -120,9 +175,9 @@ class _SessionsView extends StatelessWidget {
         builder: (ctx) => BlocProvider.value(
           value: bloc,
           child: SessionFormScreen(
-            child: child,
+            child: widget.child,
             session: session,
-            onSaved: () => bloc.add(SessionsLoadRequested(child.id)),
+            onSaved: () => bloc.add(SessionsLoadRequested(widget.child.id)),
           ),
         ),
       ),

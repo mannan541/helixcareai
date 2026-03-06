@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { authMiddleware } from '../../middleware/auth';
-import { requireAdmin } from '../../middleware/roles';
+import { asyncHandler } from '../../middleware/asyncHandler';
 import { validate } from '../../middleware/validate';
 import * as authController from './auth.controller';
 
@@ -15,7 +15,7 @@ router.post(
     body('fullName').trim().notEmpty(),
     body('role').isIn(['admin', 'therapist', 'parent']),
   ]),
-  authController.register
+  asyncHandler(authController.register)
 );
 
 router.post(
@@ -24,9 +24,20 @@ router.post(
     body('email').isEmail().normalizeEmail(),
     body('password').notEmpty(),
   ]),
-  authController.login
+  asyncHandler(authController.login)
 );
 
-router.get('/me', authMiddleware, authController.me);
+router.get('/me', authMiddleware, asyncHandler(authController.me));
+router.get('/therapists', authMiddleware, asyncHandler(authController.listTherapists));
+
+router.patch(
+  '/profile',
+  authMiddleware,
+  validate([
+    body('fullName').optional().trim().notEmpty(),
+    body('password').optional().isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  ]),
+  asyncHandler(authController.updateProfile)
+);
 
 export default router;

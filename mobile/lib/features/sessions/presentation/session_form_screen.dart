@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/di/injection.dart';
+import '../../admin/presentation/add_user_screen.dart';
+import '../../auth/domain/user_entity.dart';
 import '../domain/session_entity.dart';
 import '../../children/domain/child_entity.dart';
 import 'sessions_bloc.dart';
+
+String _formatDateTime(DateTime dt) {
+  return DateFormat('d MMM yyyy, h:mm a').format(dt);
+}
 
 class SessionFormScreen extends StatefulWidget {
   const SessionFormScreen({
@@ -20,12 +28,26 @@ class SessionFormScreen extends StatefulWidget {
   State<SessionFormScreen> createState() => _SessionFormScreenState();
 }
 
+const _therapyTitles = ['Speech', 'Behaviour', 'Occupational'];
+
+/// Maps therapist title to therapy chip (e.g. "Speech Therapist" -> "Speech").
+String? _therapyTitleFromTherapistTitle(String? therapistTitle) {
+  if (therapistTitle == null || therapistTitle.isEmpty) return null;
+  if (therapistTitle.contains('Speech')) return 'Speech';
+  if (therapistTitle.contains('Behaviour')) return 'Behaviour';
+  if (therapistTitle.contains('Occupational')) return 'Occupational';
+  return null;
+}
+
 class _SessionFormScreenState extends State<SessionFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late DateTime _date;
   final _durationController = TextEditingController();
   final _notesController = TextEditingController();
+  final _timeSlotController = TextEditingController();
   final Map<String, TextEditingController> _metricControllers = {};
+  String? _therapyTitle;
+  UserEntity? _selectedTherapist;
 
   @override
   void initState() {
@@ -34,6 +56,22 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     _durationController.text = widget.session?.durationMinutes?.toString() ?? '';
     _notesController.text = widget.session?.notesText ?? '';
     final metrics = widget.session?.structuredMetrics ?? {};
+    final session = widget.session;
+    if (session?.therapistUser != null) {
+      final u = session!.therapistUser!;
+      _selectedTherapist = UserEntity(
+        id: u.id,
+        email: u.email,
+        fullName: u.fullName,
+        role: 'therapist',
+        title: u.title,
+      );
+      _therapyTitle = metrics['therapyTitle'] as String? ?? _therapyTitleFromTherapistTitle(u.title);
+    } else {
+      _selectedTherapist = null;
+      _therapyTitle = metrics['therapyTitle'] as String?;
+    }
+    _timeSlotController.text = metrics['timeSlot']?.toString() ?? '';
     for (final e in metrics.entries) {
       _metricControllers[e.key] = TextEditingController(text: e.value?.toString() ?? '');
     }
@@ -48,6 +86,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   void dispose() {
     _durationController.dispose();
     _notesController.dispose();
+    _timeSlotController.dispose();
     for (final c in _metricControllers.values) {
       c.dispose();
     }
@@ -64,6 +103,50 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (widget.session != null) ...[
+              const Text('Created by', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(
+                widget.session!.createdByUser != null
+                    ? '${widget.session!.createdByUser!.fullName} (${widget.session!.createdByUser!.email})'
+                    : '—',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Text('Created: ${_formatDateTime(widget.session!.createdAt)}', style: Theme.of(context).textTheme.bodySmall),
+              if (widget.session!.updatedByUser != null || widget.session!.updatedAt.isAfter(widget.session!.createdAt)) ...[
+                const SizedBox(height: 4),
+                Text('Updated: ${_formatDateTime(widget.session!.updatedAt)}', style: Theme.of(context).textTheme.bodySmall),
+                if (widget.session!.updatedByUser != null)
+                  Text('Updated by: ${widget.session!.updatedByUser!.fullName}', style: Theme.of(context).textTheme.bodySmall),
+              ],
+              const SizedBox(height: 16),
+            ],
+            const Text('Therapist', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            ListTile(
+              title: Text(_selectedTherapist == null ? 'Select therapist (optional)' : '${_selectedTherapist!.fullName} (${_selectedTherapist!.email})'),
+              trailing: _selectedTherapist != null ? IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(() => _selectedTherapist = null)) : const Icon(Icons.arrow_drop_down),
+              tileColor: Theme.of(context).inputDecorationTheme.fillColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              onTap: () => _openTherapistPicker(context),
+            ),
+            const SizedBox(height: 16),
+            const Text('Therapy title', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _therapyTitles.map((t) {
+                final selected = _therapyTitle == t;
+                return FilterChip(
+                  label: Text(t),
+                  selected: selected,
+                  onSelected: (v) => setState(() => _therapyTitle = v ? t : null),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
             const Text('Structured metrics', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             ..._metricControllers.entries.map((e) => Padding(
@@ -94,16 +177,24 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
             ),
             const SizedBox(height: 8),
             TextFormField(
+              controller: _timeSlotController,
+              decoration: const InputDecoration(
+                labelText: 'Time slot (optional)',
+                hintText: 'e.g. 9:00 AM - 10:00 AM',
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
               controller: _durationController,
               decoration: const InputDecoration(labelText: 'Duration (minutes)'),
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
-            const Text('Notes (free text)', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Therapist Notes (free text)', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextFormField(
               controller: _notesController,
-              decoration: const InputDecoration(hintText: 'Session notes...'),
+              decoration: const InputDecoration(hintText: 'Therapist notes...'),
               maxLines: 4,
             ),
             const SizedBox(height: 24),
@@ -117,12 +208,111 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     );
   }
 
+  Future<void> _openTherapistPicker(BuildContext context) async {
+    final searchController = TextEditingController();
+    List<UserEntity> list = [];
+    int total = 0;
+    String searchQuery = '';
+    final currentUser = await authRepository.me();
+    final isAdmin = currentUser?.isAdmin ?? false;
+
+    Future<void> loadTherapists(String q) async {
+      final res = await authRepository.getTherapists(limit: 50, offset: 0, search: q.isEmpty ? null : q);
+      list = res.users;
+      total = res.total;
+    }
+
+    await loadTherapists('');
+    if (!context.mounted) return;
+    final addNewRequested = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx2, setDialogState) {
+            return AlertDialog(
+              title: const Text('Select therapist'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isAdmin)
+                      ListTile(
+                        leading: const Icon(Icons.person_add),
+                        title: const Text('Add new therapist'),
+                        onTap: () => Navigator.of(ctx).pop(true),
+                      ),
+                    TextField(
+                      controller: searchController,
+                      decoration: const InputDecoration(
+                        hintText: 'Type to search by name or email',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (v) {
+                        searchQuery = v;
+                        loadTherapists(v).then((_) {
+                          if (ctx2.mounted) setDialogState(() {});
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: list.isEmpty
+                          ? Padding(padding: const EdgeInsets.all(24), child: Text(total == 0 ? 'No therapists found' : 'Loading...'))
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: list.length,
+                              itemBuilder: (_, i) {
+                                final u = list[i];
+                                return ListTile(
+                                  title: Text(u.fullName),
+                                  subtitle: Text(u.email),
+                                  onTap: () {
+                                    final therapyFromTitle = _therapyTitleFromTherapistTitle(u.title);
+                                    setState(() {
+                                      _selectedTherapist = u;
+                                      if (therapyFromTitle != null) _therapyTitle = therapyFromTitle;
+                                    });
+                                    Navigator.of(ctx).pop(false);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+              ],
+            );
+          },
+        );
+      },
+    );
+    searchController.dispose();
+
+    if (addNewRequested == true && mounted) {
+      final newTherapist = await Navigator.of(context).push<UserEntity?>(
+        MaterialPageRoute(
+          builder: (_) => AddUserScreen(therapistOnly: true),
+        ),
+      );
+      if (newTherapist != null && mounted) {
+        setState(() => _selectedTherapist = newTherapist);
+      }
+    }
+  }
+
   String _metricLabel(String key) {
     return key.replaceFirst(key[0], key[0].toUpperCase());
   }
 
   void _submit(BuildContext context) {
     final structuredMetrics = <String, dynamic>{};
+    if (_therapyTitle != null) structuredMetrics['therapyTitle'] = _therapyTitle;
+    final timeSlot = _timeSlotController.text.trim();
+    if (timeSlot.isNotEmpty) structuredMetrics['timeSlot'] = timeSlot;
     for (final e in _metricControllers.entries) {
       final v = e.value.text.trim();
       if (v.isNotEmpty) {
@@ -135,6 +325,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     if (widget.session != null) {
       context.read<SessionsBloc>().add(SessionUpdateRequested(
             id: widget.session!.id,
+            therapistId: _selectedTherapist?.id,
             sessionDate: _date,
             durationMinutes: duration,
             notesText: notesText,
@@ -144,6 +335,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       context.read<SessionsBloc>().add(SessionCreateRequested(
             childId: widget.child.id,
             sessionDate: _date,
+            therapistId: _selectedTherapist?.id,
             durationMinutes: duration,
             notesText: notesText,
             structuredMetrics: structuredMetrics.isEmpty ? null : structuredMetrics,

@@ -7,6 +7,8 @@ class ChildEntity extends Equatable {
   final String lastName;
   final String? dateOfBirth;
   final String? notes;
+  final String? diagnosis;
+  final String? referredBy;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,6 +19,8 @@ class ChildEntity extends Equatable {
     required this.lastName,
     this.dateOfBirth,
     this.notes,
+    this.diagnosis,
+    this.referredBy,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -24,5 +28,5 @@ class ChildEntity extends Equatable {
   String get fullName => '$firstName $lastName'.trim();
 
   @override
-  List<Object?> get props => [id, userId, firstName, lastName, dateOfBirth, notes, createdAt, updatedAt];
+  List<Object?> get props => [id, userId, firstName, lastName, dateOfBirth, notes, diagnosis, referredBy, createdAt, updatedAt];
 }

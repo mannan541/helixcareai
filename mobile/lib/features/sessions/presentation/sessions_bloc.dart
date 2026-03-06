@@ -16,11 +16,25 @@ class SessionsBloc extends Bloc<SessionsEvent, SessionsState> {
     on<SessionDeleteRequested>(_onDelete);
   }
 
+  static const int _pageSize = 20;
+
   Future<void> _onLoad(SessionsLoadRequested e, Emitter<SessionsState> emit) async {
+    if (e.loadMore) {
+      final current = state;
+      if (current.isLoadingMore || !current.hasMore || current.sessions.isEmpty) return;
+      emit(SessionsState.loadingMore(current.sessions, total: current.total));
+      try {
+        final res = await _repo.listByChild(e.childId, limit: _pageSize, offset: current.sessions.length);
+        emit(SessionsState.loaded([...current.sessions, ...res.sessions], total: res.total));
+      } catch (err) {
+        emit(SessionsState.failure(err is Exception ? err.toString() : 'Failed to load more'));
+      }
+      return;
+    }
     emit(const SessionsState.loading());
     try {
-      final list = await _repo.listByChild(e.childId);
-      emit(SessionsState.loaded(list));
+      final res = await _repo.listByChild(e.childId, limit: _pageSize, offset: 0);
+      emit(SessionsState.loaded(res.sessions, total: res.total));
     } catch (err) {
       emit(SessionsState.failure(err is Exception ? err.toString() : 'Failed to load sessions'));
     }
@@ -35,11 +49,12 @@ class SessionsBloc extends Bloc<SessionsEvent, SessionsState> {
       final session = await _repo.create(
         childId: e.childId,
         sessionDate: e.sessionDate.toIso8601String().split('T').first,
+        therapistId: e.therapistId,
         durationMinutes: e.durationMinutes,
         notesText: e.notesText,
         structuredMetrics: e.structuredMetrics,
       );
-      emit(SessionsState.loaded([session, ...previousList]));
+      emit(SessionsState.loaded([session, ...previousList], total: current.total + 1));
     } catch (err) {
       emit(SessionsState.failure(err is Exception ? err.toString() : 'Create failed'));
     }
@@ -52,12 +67,13 @@ class SessionsBloc extends Bloc<SessionsEvent, SessionsState> {
     emit(const SessionsState.loading());
     try {
       final updated = await _repo.update(e.id,
+          therapistId: e.therapistId,
           sessionDate: e.sessionDate?.toIso8601String().split('T').first,
           durationMinutes: e.durationMinutes,
           notesText: e.notesText,
           structuredMetrics: e.structuredMetrics);
       final list = previousList.map((s) => s.id == updated.id ? updated : s).toList();
-      emit(SessionsState.loaded(list));
+      emit(SessionsState.loaded(list, total: current.total));
     } catch (err) {
       emit(SessionsState.failure(err is Exception ? err.toString() : 'Update failed'));
     }
@@ -70,7 +86,7 @@ class SessionsBloc extends Bloc<SessionsEvent, SessionsState> {
     emit(const SessionsState.loading());
     try {
       await _repo.delete(e.id);
-      emit(SessionsState.loaded(previousList.where((s) => s.id != e.id).toList()));
+      emit(SessionsState.loaded(previousList.where((s) => s.id != e.id).toList(), total: current.total - 1));
     } catch (err) {
       emit(SessionsState.failure(err is Exception ? err.toString() : 'Delete failed'));
     }

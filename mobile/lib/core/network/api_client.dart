@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ApiClient {
   late final Dio _dio;
   String? _token;
+  void Function()? _onUnauthorized;
 
   ApiClient() {
     final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
@@ -22,11 +23,15 @@ class ApiClient {
       },
       onError: (err, handler) {
         if (err.response?.statusCode == 401) {
-          // Could emit logout event here
+          _onUnauthorized?.call();
         }
         return handler.next(err);
       },
     ));
+  }
+
+  void setOnUnauthorized(void Function() callback) {
+    _onUnauthorized = callback;
   }
 
   void setToken(String? token) {

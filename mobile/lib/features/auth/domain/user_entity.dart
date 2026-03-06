@@ -5,12 +5,14 @@ class UserEntity extends Equatable {
   final String email;
   final String fullName;
   final String role;
+  final String? title;
 
   const UserEntity({
     required this.id,
     required this.email,
     required this.fullName,
     required this.role,
+    this.title,
   });
 
   bool get isAdmin => role == 'admin';
@@ -18,5 +20,5 @@ class UserEntity extends Equatable {
   bool get isParent => role == 'parent';
 
   @override
-  List<Object?> get props => [id, email, fullName, role];
+  List<Object?> get props => [id, email, fullName, role, title];
 }
