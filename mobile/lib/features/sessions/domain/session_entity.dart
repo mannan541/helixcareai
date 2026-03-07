@@ -6,16 +6,19 @@ class SessionUserInfo extends Equatable {
   final String fullName;
   final String email;
   final String? title;
+  /// Therapist only; present when therapist allows visibility to parents.
+  final String? mobileNumber;
 
   const SessionUserInfo({
     required this.id,
     required this.fullName,
     required this.email,
     this.title,
+    this.mobileNumber,
   });
 
   @override
-  List<Object?> get props => [id, fullName, email, title];
+  List<Object?> get props => [id, fullName, email, title, mobileNumber];
 }
 
 /// Alias for backward compatibility.

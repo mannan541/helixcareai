@@ -95,6 +95,15 @@ class _RegisterViewState extends State<_RegisterView> {
                         (route) => false,
                         arguments: state.user,
                       );
+                    } else if (state.status == AuthStatus.registrationPendingApproval) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Account created. You cannot sign in until an admin approves your account.',
+                          ),
+                        ),
+                      );
+                      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
                     } else if (state.status == AuthStatus.failure && state.errorMessage != null) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.errorMessage!)));
                     }

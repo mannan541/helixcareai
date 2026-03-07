@@ -19,8 +19,23 @@ CREATE TABLE IF NOT EXISTS users (
   updated_by    UUID REFERENCES users(id) ON DELETE SET NULL,
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   deleted_by    UUID REFERENCES users(id) ON DELETE SET NULL,
-  deleted_at    TIMESTAMPTZ
+  deleted_at    TIMESTAMPTZ,
+  approved_at   TIMESTAMPTZ
 );
+
+-- Approval: NULL = pending (signup), NOT NULL = approved. Existing users get approved when column is added.
+DO $$
+BEGIN
+  ALTER TABLE users ADD COLUMN approved_at TIMESTAMPTZ DEFAULT NOW();
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Disabled: NULL = active, NOT NULL = disabled (cannot login; existing sessions rejected).
+DO $$
+BEGIN
+  ALTER TABLE users ADD COLUMN disabled_at TIMESTAMPTZ;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -28,6 +43,19 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 DO $$
 BEGIN
   ALTER TABLE users ADD COLUMN title VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE users ADD COLUMN mobile_number VARCHAR(50);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+
+-- Therapist only: when true, parent can see therapist's mobile number on sessions.
+DO $$
+BEGIN
+  ALTER TABLE users ADD COLUMN show_mobile_to_parents BOOLEAN NOT NULL DEFAULT false;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
@@ -84,6 +112,22 @@ CREATE INDEX IF NOT EXISTS idx_sessions_child_id ON sessions(child_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_created_by ON sessions(created_by);
 CREATE INDEX IF NOT EXISTS idx_sessions_session_date ON sessions(session_date);
 CREATE INDEX IF NOT EXISTS idx_sessions_structured_metrics ON sessions USING GIN (structured_metrics);
+
+-- ============== NOTIFICATIONS ==============
+CREATE TABLE IF NOT EXISTS notifications (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type       VARCHAR(50) NOT NULL,
+  title      VARCHAR(500) NOT NULL,
+  body       TEXT,
+  read_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  meta       JSONB DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(read_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 
 -- ============== EMBEDDINGS (pgvector for RAG) ==============
 CREATE TABLE IF NOT EXISTS embeddings (

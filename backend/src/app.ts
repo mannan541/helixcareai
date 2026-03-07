@@ -15,6 +15,7 @@ import sessionsRoutes from './modules/sessions/sessions.routes';
 import chatRoutes from './modules/chat/chat.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import aiRoutes from './modules/ai/aiRoutes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use('/api/sessions', sessionsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.get('/api-docs/spec', (req, res) => res.json(specWithServer(req)));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, { customSiteTitle: 'HelixCareAI API', swaggerOptions: { url: '/api-docs/spec' } }));

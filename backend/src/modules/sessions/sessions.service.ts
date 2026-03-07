@@ -54,7 +54,7 @@ export async function create(
 
 const SESSION_COLS = 's.id, s.child_id, s.created_by, s.therapist_id, s.session_date, s.duration_minutes, s.notes_text, s.structured_metrics, s.created_at, s.updated_at, s.updated_by, s.deleted_by, s.deleted_at';
 const CB_COLS = 'u_cb.id AS _cb_id, u_cb.full_name AS _cb_full_name, u_cb.email AS _cb_email, u_cb.title AS _cb_title';
-const TH_COLS = 'u_th.id AS _th_id, u_th.full_name AS _th_full_name, u_th.email AS _th_email, u_th.title AS _th_title';
+const TH_COLS = 'u_th.id AS _th_id, u_th.full_name AS _th_full_name, u_th.email AS _th_email, u_th.title AS _th_title, u_th.mobile_number AS _th_mobile_number, COALESCE(u_th.show_mobile_to_parents, false) AS _th_show_mobile_to_parents';
 const UB_COLS = 'u_ub.id AS _ub_id, u_ub.full_name AS _ub_full_name, u_ub.email AS _ub_email';
 const SESSION_JOIN_USERS = `FROM sessions s
   LEFT JOIN users u_cb ON s.created_by = u_cb.id
@@ -70,6 +70,8 @@ export type SessionWithUserRow = SessionRow & {
   _th_full_name: string | null;
   _th_email: string | null;
   _th_title: string | null;
+  _th_mobile_number: string | null;
+  _th_show_mobile_to_parents: boolean;
   _ub_id: string | null;
   _ub_full_name: string | null;
   _ub_email: string | null;
@@ -301,4 +303,39 @@ export async function listSessionComments(sessionId: string): Promise<SessionCom
     [sessionId]
   );
   return rows;
+}
+
+export async function findCommentById(commentId: string): Promise<SessionCommentRow | null> {
+  const rows = await query<SessionCommentRow>(
+    'SELECT id, session_id, user_id, comment, created_at FROM session_comments WHERE id = $1 AND deleted_at IS NULL',
+    [commentId]
+  );
+  return rows[0] ?? null;
+}
+
+/** Update a comment. Only the comment author can update. Returns updated comment with user info or null. */
+export async function updateSessionComment(
+  commentId: string,
+  userId: string,
+  comment: string
+): Promise<SessionCommentWithUserRow | null> {
+  const existing = await findCommentById(commentId);
+  if (!existing || existing.user_id !== userId) return null;
+  const rows = await query<SessionCommentRow>(
+    `UPDATE session_comments SET comment = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3 AND deleted_at IS NULL RETURNING *`,
+    [comment.trim(), userId, commentId]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  const userRows = await query<{ id: string; full_name: string; email: string }>(
+    'SELECT id, full_name, email FROM users WHERE id = $1',
+    [userId]
+  );
+  const u = userRows[0];
+  return {
+    ...row,
+    _u_id: u?.id ?? userId,
+    _u_full_name: u?.full_name ?? '',
+    _u_email: u?.email ?? '',
+  };
 }

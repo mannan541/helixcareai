@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
+import * as authService from '../modules/auth/auth.service';
 
 export type JwtPayload = {
   userId: string;
@@ -16,7 +17,7 @@ declare global {
   }
 }
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Missing or invalid authorization header' });
@@ -25,6 +26,11 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   const token = authHeader.slice(7);
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    const canAccess = await authService.userCanAccess(decoded.userId);
+    if (!canAccess) {
+      res.status(401).json({ error: 'Account is disabled or deleted. You have been logged out.' });
+      return;
+    }
     req.user = decoded;
     next();
   } catch {

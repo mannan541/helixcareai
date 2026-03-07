@@ -206,7 +206,7 @@ class _SessionsViewState extends State<_SessionsView> {
             child: widget.child,
             session: session,
             canEdit: canEdit,
-            canAddNotes: !canEdit,
+            canAddNotes: true,
             onSaved: () => bloc.add(SessionsLoadRequested(widget.child.id)),
           ),
         ),

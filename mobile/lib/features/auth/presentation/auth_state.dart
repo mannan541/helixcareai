@@ -1,6 +1,6 @@
 part of 'auth_bloc.dart';
 
-enum AuthStatus { initial, loading, authenticated, unauthenticated, failure }
+enum AuthStatus { initial, loading, authenticated, unauthenticated, failure, registrationPendingApproval }
 
 class AuthState extends Equatable {
   final AuthStatus status;
@@ -44,6 +44,12 @@ class AuthState extends Equatable {
         user = null,
         token = null,
         errorMessage = msg;
+
+  AuthState.registrationPendingApproval(UserEntity u)
+      : status = AuthStatus.registrationPendingApproval,
+        user = u,
+        token = null,
+        errorMessage = null;
 
   @override
   List<Object?> get props => [status, user, token, errorMessage];

@@ -38,6 +38,8 @@ router.patch(
     body('fullName').optional().trim().notEmpty(),
     body('currentPassword').optional().isString(),
     body('password').optional().isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('mobileNumber').optional({ nullable: true }).isString(),
+    body('showMobileToParents').optional().isBoolean(),
   ]),
   asyncHandler(authController.updateProfile)
 );

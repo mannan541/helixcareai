@@ -13,6 +13,11 @@ export type UserRow = {
   full_name: string;
   role: string;
   title: string | null;
+  approved_at: string | null;
+  deleted_at: string | null;
+  disabled_at: string | null;
+  mobile_number: string | null;
+  show_mobile_to_parents: boolean;
 };
 
 export async function hashPassword(password: string): Promise<string> {
@@ -23,16 +28,30 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
+/** Find user by email for login; returns user even if deleted/disabled so we can return the right error. */
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
   return queryOne<UserRow>(
-    'SELECT id, email, password_hash, full_name, role, title FROM users WHERE email = $1 AND deleted_at IS NULL',
+    `SELECT id, email, password_hash, full_name, role, title, approved_at, deleted_at, disabled_at,
+     COALESCE(mobile_number, NULL) AS mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents
+     FROM users WHERE email = $1`,
     [email.toLowerCase().trim()]
   );
 }
 
+/** Returns true if user exists and is not deleted and not disabled (for auth middleware). */
+export async function userCanAccess(userId: string): Promise<boolean> {
+  const row = await queryOne<{ id: string }>(
+    'SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL',
+    [userId]
+  );
+  return row != null;
+}
+
 export async function findUserById(id: string): Promise<Omit<UserRow, 'password_hash'> | null> {
   const row = await queryOne<UserRow>(
-    'SELECT id, email, password_hash, full_name, role, title FROM users WHERE id = $1 AND deleted_at IS NULL',
+    `SELECT id, email, password_hash, full_name, role, title, approved_at, deleted_at, disabled_at,
+     mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents
+     FROM users WHERE id = $1 AND deleted_at IS NULL`,
     [id]
   );
   if (!row) return null;
@@ -50,15 +69,17 @@ export async function verifyUserPassword(userId: string, password: string): Prom
   return verifyPassword(password, row.password_hash);
 }
 
-export type UserListItem = { id: string; email: string; full_name: string; role: string; title: string | null };
+export type UserListItem = { id: string; email: string; full_name: string; role: string; title: string | null; approved_at: string | null; disabled_at: string | null; mobile_number: string | null; show_mobile_to_parents: boolean };
 
 export async function findUsers(opts: {
   role?: string;
   limit: number;
   offset: number;
   search?: string;
+  /** When true, only approved users; when false, only pending (approved_at IS NULL). Omit for all. */
+  approved?: boolean;
 }): Promise<{ users: UserListItem[]; total: number }> {
-  const { role, limit, offset, search } = opts;
+  const { role, limit, offset, search, approved } = opts;
   const conditions: string[] = [];
   const params: unknown[] = [];
   let i = 1;
@@ -71,6 +92,8 @@ export async function findUsers(opts: {
     const term = `%${search.trim()}%`;
     params.push(term, term);
   }
+  if (approved === true) conditions.push('approved_at IS NOT NULL');
+  else if (approved === false) conditions.push('approved_at IS NULL');
   conditions.push('deleted_at IS NULL');
   const where = `WHERE ${conditions.join(' AND ')}`;
   const countRows = await query<{ count: string }>(
@@ -80,8 +103,8 @@ export async function findUsers(opts: {
   const total = parseInt(countRows[0]?.count ?? '0', 10);
   const limitIdx = params.length + 1;
   const offsetIdx = params.length + 2;
-  const users = await query<{ id: string; email: string; full_name: string; role: string; title: string | null }>(
-    `SELECT id, email, full_name, role, title FROM users ${where} ORDER BY full_name ASC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+  const users = await query<{ id: string; email: string; full_name: string; role: string; title: string | null; approved_at: string | null; disabled_at: string | null; mobile_number: string | null; show_mobile_to_parents: boolean }>(
+    `SELECT id, email, full_name, role, title, approved_at, disabled_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents FROM users ${where} ORDER BY full_name ASC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     [...params, limit, offset]
   );
   return { users, total };
@@ -92,17 +115,67 @@ export async function createUser(
   password: string,
   fullName: string,
   role: string,
-  title?: string | null
-): Promise<{ id: string; email: string; full_name: string; role: string; title: string | null }> {
+  title?: string | null,
+  approved: boolean = false,
+  mobileNumber?: string | null,
+  showMobileToParents?: boolean
+): Promise<{ id: string; email: string; full_name: string; role: string; title: string | null; mobile_number: string | null; show_mobile_to_parents: boolean }> {
   const emailNorm = email.toLowerCase().trim();
   const hash = await hashPassword(password);
-  const rows = await query<{ id: string; email: string; full_name: string; role: string; title: string | null }>(
-    `INSERT INTO users (email, password_hash, full_name, role, title)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, email, full_name, role, title`,
-    [emailNorm, hash, fullName.trim(), role, title ?? null]
+  const approvedAt = approved ? new Date() : null;
+  const show = showMobileToParents === true;
+  const rows = await query<{ id: string; email: string; full_name: string; role: string; title: string | null; mobile_number: string | null; show_mobile_to_parents: boolean }>(
+    `INSERT INTO users (email, password_hash, full_name, role, title, approved_at, mobile_number, show_mobile_to_parents)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, email, full_name, role, title, mobile_number, show_mobile_to_parents`,
+    [emailNorm, hash, fullName.trim(), role, title ?? null, approvedAt, (mobileNumber ?? '').trim() || null, show]
   );
   return rows[0];
+}
+
+/** Set user as approved so they can sign in. Returns true if updated. */
+export async function approveUser(id: string): Promise<boolean> {
+  const result = await query(
+    'UPDATE users SET approved_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND approved_at IS NULL RETURNING id',
+    [id]
+  );
+  return result.length > 0;
+}
+
+/** Get IDs of all approved admin users (e.g. for broadcasting notifications). Excludes disabled/deleted. */
+export async function getAdminUserIds(): Promise<string[]> {
+  const rows = await query<{ id: string }>(
+    "SELECT id FROM users WHERE role = 'admin' AND deleted_at IS NULL AND disabled_at IS NULL AND approved_at IS NOT NULL",
+    []
+  );
+  return rows.map((r) => r.id);
+}
+
+/** Disable user (they cannot login; existing token will be rejected on next request). Returns true if updated. */
+export async function disableUser(id: string): Promise<boolean> {
+  const result = await query(
+    'UPDATE users SET disabled_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL RETURNING id',
+    [id]
+  );
+  return result.length > 0;
+}
+
+/** Re-enable a disabled user. Returns true if updated. */
+export async function enableUser(id: string): Promise<boolean> {
+  const result = await query(
+    'UPDATE users SET disabled_at = NULL, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NOT NULL RETURNING id',
+    [id]
+  );
+  return result.length > 0;
+}
+
+/** Soft-delete user (set deleted_at; they cannot login; existing token rejected). Returns true if updated. */
+export async function deleteUser(id: string, deletedByUserId: string): Promise<boolean> {
+  const result = await query(
+    'UPDATE users SET deleted_at = NOW(), deleted_by = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING id',
+    [deletedByUserId, id]
+  );
+  return result.length > 0;
 }
 
 export function signToken(payload: JwtPayload): string {
@@ -111,8 +184,8 @@ export function signToken(payload: JwtPayload): string {
 
 export async function updateUser(
   id: string,
-  data: { fullName?: string; password?: string; title?: string | null }
-): Promise<{ id: string; email: string; full_name: string; role: string; title: string | null } | null> {
+  data: { fullName?: string; password?: string; title?: string | null; mobileNumber?: string | null; showMobileToParents?: boolean }
+): Promise<{ id: string; email: string; full_name: string; role: string; title: string | null; mobile_number: string | null; show_mobile_to_parents: boolean } | null> {
   const updates: string[] = [];
   const values: unknown[] = [];
   let i = 1;
@@ -128,11 +201,19 @@ export async function updateUser(
     updates.push(`title = $${i++}`);
     values.push(data.title?.trim() ?? null);
   }
+  if (data.mobileNumber !== undefined) {
+    updates.push(`mobile_number = $${i++}`);
+    values.push((data.mobileNumber ?? '').trim() || null);
+  }
+  if (data.showMobileToParents !== undefined) {
+    updates.push(`show_mobile_to_parents = $${i++}`);
+    values.push(data.showMobileToParents === true);
+  }
   if (updates.length === 0) return null;
   values.push(id);
-  const rows = await query<{ id: string; email: string; full_name: string; role: string; title: string | null }>(
+  const rows = await query<{ id: string; email: string; full_name: string; role: string; title: string | null; mobile_number: string | null; show_mobile_to_parents: boolean }>(
     `UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${i}
-     RETURNING id, email, full_name, role, title`,
+     RETURNING id, email, full_name, role, title, mobile_number, show_mobile_to_parents`,
     values
   );
   return rows[0] ?? null;

@@ -63,4 +63,14 @@ router.post(
   sessionsController.addComment
 );
 
+router.patch(
+  '/:id/comments/:commentId',
+  validate([
+    param('id').isUUID(),
+    param('commentId').isUUID(),
+    body('comment').isString().notEmpty().trim(),
+  ]),
+  sessionsController.updateComment
+);
+
 export default router;

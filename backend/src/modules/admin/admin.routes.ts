@@ -32,6 +32,7 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('offset').optional().isInt({ min: 0 }),
     query('q').optional().isString(),
+    query('pending').optional().isIn(['true', 'false', '1', '0']),
   ]),
   asyncHandler(adminController.listUsers)
 );
@@ -41,7 +42,35 @@ const updateUserValidations = [
   body('fullName').optional().trim().notEmpty(),
   body('title').optional({ nullable: true }).custom((val) => val === null || typeof val === 'string'),
   body('password').optional().isString().isLength({ min: 8 }),
+  body('childIds').optional().isArray(),
+  body('childIds.*').optional().isUUID(),
+  body('mobileNumber').optional({ nullable: true }).isString(),
+  body('showMobileToParents').optional().isBoolean(),
 ];
+
+router.put(
+  '/users/:id/approve',
+  validate([param('id').isUUID()]),
+  asyncHandler(adminController.approveUser)
+);
+
+router.put(
+  '/users/:id/disable',
+  validate([param('id').isUUID()]),
+  asyncHandler(adminController.disableUser)
+);
+
+router.put(
+  '/users/:id/enable',
+  validate([param('id').isUUID()]),
+  asyncHandler(adminController.enableUser)
+);
+
+router.delete(
+  '/users/:id',
+  validate([param('id').isUUID()]),
+  asyncHandler(adminController.deleteUser)
+);
 
 router
   .route('/users/:id')

@@ -18,6 +18,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DashboardCounts? _counts;
   int? _childrenCount; // for therapist/parent
   int? _sessionsCount; // for therapist: my sessions; for parent: children's sessions
+  int _notificationUnreadCount = 0;
   bool _loading = true;
   String? _error;
 
@@ -58,12 +59,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         childrenCount = userCounts?.children;
         sessionsCount = userCounts?.sessions;
       }
+      final unreadCount = await authRepository.getNotificationUnreadCount();
       if (!mounted) return;
       setState(() {
         _user = user;
         _counts = counts;
         _childrenCount = childrenCount;
         _sessionsCount = sessionsCount;
+        _notificationUnreadCount = unreadCount;
         _loading = false;
       });
     } catch (e) {
@@ -101,6 +104,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
+          IconButton(
+            icon: _notificationUnreadCount > 0
+                ? Badge(
+                    label: Text(_notificationUnreadCount > 99 ? '99+' : '$_notificationUnreadCount'),
+                    child: const Icon(Icons.notifications),
+                  )
+                : const Icon(Icons.notifications_outlined),
+            onPressed: () async {
+              await Navigator.of(context).pushNamed('/notifications');
+              _load();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () => Navigator.of(context).pushNamed('/edit_profile'),
@@ -182,6 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final therapists = c?.therapists ?? 0;
     final parents = c?.parents ?? 0;
     final totalUsers = c?.totalUsers ?? 0;
+    final pendingUsers = c?.pendingUsers ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -192,6 +208,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 16),
+        if (pendingUsers > 0) ...[
+          _DashboardCard(
+            title: 'Pending approvals',
+            count: pendingUsers,
+            icon: Icons.pending_actions,
+            onTap: () => _navigateTo(context, '/pending_users'),
+          ),
+          const SizedBox(height: 12),
+        ],
         Row(
           children: [
             Expanded(child: _DashboardCard(

@@ -484,6 +484,7 @@ class _AddChildSheetState extends State<_AddChildSheet> {
           ],
         ),
       ),
+    ),
     );
   }
 }

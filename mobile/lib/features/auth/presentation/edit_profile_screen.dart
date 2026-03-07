@@ -12,6 +12,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
+  final _mobileController = TextEditingController();
   final _currentPasswordController = TextEditingController();
   final _passwordController = TextEditingController();
   UserEntity? _user;
@@ -20,6 +21,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _saving = false;
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
+  bool _showMobileToParents = false;
 
   @override
   void initState() {
@@ -35,7 +37,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _user = user;
           _loading = false;
           _error = user == null ? 'Not signed in' : null;
-          if (user != null) _fullNameController.text = user.fullName;
+          if (user != null) {
+            _fullNameController.text = user.fullName;
+            _mobileController.text = user.mobileNumber ?? '';
+            _showMobileToParents = user.showMobileToParents ?? false;
+          }
         });
       }
     } catch (e) {
@@ -46,6 +52,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _mobileController.dispose();
     _currentPasswordController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -86,6 +93,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               decoration: const InputDecoration(labelText: 'Full name'),
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _mobileController,
+              decoration: const InputDecoration(labelText: 'Mobile number', hintText: 'Optional'),
+              keyboardType: TextInputType.phone,
+            ),
+            if (user.isTherapist) ...[
+              const SizedBox(height: 12),
+              SwitchListTile(
+                title: const Text('Show mobile number to parents'),
+                subtitle: const Text('Parents can see your mobile on session details when enabled'),
+                value: _showMobileToParents,
+                onChanged: (v) => setState(() => _showMobileToParents = v),
+              ),
+            ],
             const SizedBox(height: 16),
             if (!user.isAdmin) ...[
               TextFormField(
@@ -137,6 +159,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     final fullName = _fullNameController.text.trim();
+    final mobileNumber = _mobileController.text.trim();
     final password = _passwordController.text.trim().isEmpty ? null : _passwordController.text.trim();
     final currentPassword = password != null && !_user!.isAdmin
         ? (_currentPasswordController.text.isEmpty ? null : _currentPasswordController.text)
@@ -146,6 +169,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         fullName: fullName,
         password: password,
         currentPassword: currentPassword,
+        mobileNumber: mobileNumber.isEmpty ? null : mobileNumber,
+        showMobileToParents: _user!.isTherapist ? _showMobileToParents : null,
       );
       if (!context.mounted) return;
       if (updated != null) {

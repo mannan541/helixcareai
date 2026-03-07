@@ -6,12 +6,14 @@ import 'features/auth/presentation/edit_profile_screen.dart';
 import 'features/children/presentation/child_detail_screen.dart';
 import 'features/children/presentation/children_list_screen.dart';
 import 'features/sessions/presentation/sessions_screen.dart';
+import 'features/sessions/presentation/session_detail_route_screen.dart';
 import 'features/chat/presentation/chat_screen.dart';
 import 'features/admin/presentation/add_user_screen.dart';
 import 'features/admin/presentation/edit_user_screen.dart';
 import 'features/admin/presentation/users_list_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/analytics/presentation/analytics_screen.dart';
+import 'features/notifications/presentation/notifications_screen.dart';
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
 
@@ -52,8 +54,9 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
         '/children': (_) => const ChildrenListScreen(),
         '/users': (ctx) {
           final args = ModalRoute.of(ctx)?.settings.arguments;
-          return UsersListScreen(roleFilter: args is String ? args : null);
+          return UsersListScreen(roleFilter: args is String ? args : null, pendingOnly: false);
         },
+        '/pending_users': (_) => const UsersListScreen(pendingOnly: true),
         '/edit_profile': (_) => const EditProfileScreen(),
         '/add_user': (ctx) {
           final args = ModalRoute.of(ctx)?.settings.arguments;
@@ -82,8 +85,22 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
           return ChildDetailScreen(child: args.child, childrenBloc: args.childrenBloc);
         },
         '/sessions': (_) => const SessionsScreen(),
+        '/session_detail': (ctx) {
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          if (args is! Map || args['sessionId'] is! String || args['childId'] is! String) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Session')),
+              body: const Center(child: Text('Invalid session link.')),
+            );
+          }
+          return SessionDetailRouteScreen(
+            sessionId: args['sessionId'] as String,
+            childId: args['childId'] as String,
+          );
+        },
         '/chat': (_) => const ChatScreen(),
         '/analytics': (_) => const AnalyticsScreen(),
+        '/notifications': (_) => const NotificationsScreen(),
       },
     );
   }

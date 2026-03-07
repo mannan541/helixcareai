@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/utils/date_format.dart';
+import '../../auth/data/auth_repository.dart';
 import '../domain/session_entity.dart';
 import '../data/sessions_repository.dart';
 import '../../children/domain/child_entity.dart';
@@ -22,7 +23,7 @@ class SessionDetailScreen extends StatefulWidget {
   final SessionEntity session;
   /// Admin and therapist can edit the session.
   final bool canEdit;
-  /// Only parents can add notes (comments) on a session.
+  /// Whether the user can add notes (comments) on a session (parent, therapist, admin).
   final bool canAddNotes;
   final VoidCallback onSaved;
 
@@ -34,11 +35,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   List<SessionCommentEntity> _comments = [];
   bool _loadingComments = true;
   bool _postingComment = false;
+  String? _currentUserId;
   final _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    authRepository.me().then((u) {
+      if (mounted) setState(() => _currentUserId = u?.id);
+    });
     _loadComments();
   }
 
@@ -77,6 +82,50 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       }
     } finally {
       if (mounted) setState(() => _postingComment = false);
+    }
+  }
+
+  Future<void> _editComment(SessionCommentEntity c) async {
+    final controller = TextEditingController(text: c.comment);
+    final updated = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Edit note"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: "Note text",
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) Navigator.pop(ctx, text);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (updated == null || !mounted) return;
+    try {
+      await sessionsRepository.updateComment(widget.session.id, c.id, updated);
+      if (mounted) _loadComments();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: SelectableText(e is Exception ? e.toString() : 'Failed to update note')),
+        );
+      }
     }
   }
 
@@ -126,6 +175,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             s.therapistUser != null ? '${s.therapistUser!.fullName} (${s.therapistUser!.email})' : '—',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          if (s.therapistUser?.mobileNumber != null && s.therapistUser!.mobileNumber!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('Mobile: ${s.therapistUser!.mobileNumber}', style: Theme.of(context).textTheme.bodyMedium),
+          ],
           const SizedBox(height: 12),
           Text('Created: ${formatAppDateTime(s.createdAt)}', style: Theme.of(context).textTheme.bodySmall),
           if (s.updatedByUser != null || s.updatedAt.isAfter(s.createdAt)) ...[
@@ -153,30 +206,50 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 )),
           ],
           const SizedBox(height: 24),
-          const Text("Parent's Notes", style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('Notes', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           if (_loadingComments)
             const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
           else if (_comments.isEmpty)
-            Text("No parent's notes yet.", style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey))
+            Text('No notes yet.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey))
           else
-            ..._comments.map((c) => Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
+            ..._comments.map((c) {
+              final canEditComment = _currentUserId != null && c.userId == _currentUserId;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(c.userFullName ?? c.userId, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        if (c.userEmail != null) Text(c.userEmail!, style: Theme.of(context).textTheme.bodySmall),
-                        const SizedBox(height: 4),
-                        Text(c.comment),
-                        const SizedBox(height: 4),
-                        Text(formatAppDateTime(c.createdAt), style: Theme.of(context).textTheme.bodySmall),
-                      ],
-                    ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(c.userFullName ?? c.userId, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  if (c.userEmail != null) Text(c.userEmail!, style: Theme.of(context).textTheme.bodySmall),
+                                ],
+                              ),
+                            ),
+                          if (canEditComment)
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              tooltip: 'Edit note',
+                              onPressed: () => _editComment(c),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(c.comment),
+                      const SizedBox(height: 4),
+                      Text(formatAppDateTime(c.createdAt), style: Theme.of(context).textTheme.bodySmall),
+                    ],
                   ),
-                )),
+                ),
+              );
+            }),
           if (widget.canAddNotes) ...[
             const SizedBox(height: 16),
             Row(
@@ -185,7 +258,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                   child: TextField(
                     controller: _commentController,
                     decoration: const InputDecoration(
-                      hintText: "Add a parent's note...",
+                      hintText: 'Add a note...',
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 2,

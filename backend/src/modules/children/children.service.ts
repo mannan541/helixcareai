@@ -323,6 +323,38 @@ export async function assignChildrenToUser(childIds: string[], userId: string): 
   }
 }
 
+/** Get child IDs currently assigned to this user (parent). */
+export async function getChildIdsByUserId(userId: string): Promise<string[]> {
+  const rows = await query<{ id: string }>(
+    'SELECT id FROM children WHERE user_id = $1 AND deleted_at IS NULL',
+    [userId]
+  );
+  return rows.map((r) => r.id);
+}
+
+/**
+ * Set which children belong to a parent. Unassigns children no longer in the list (reassigns to first admin).
+ * Then assigns the given childIds to the parent.
+ */
+export async function setParentChildren(parentUserId: string, childIds: string[]): Promise<void> {
+  const adminRow = await queryOne<{ id: string }>("SELECT id FROM users WHERE role = 'admin' AND deleted_at IS NULL LIMIT 1");
+  const fallbackUserId = adminRow?.id;
+  if (!fallbackUserId) return;
+  if (childIds.length === 0) {
+    await query(
+      'UPDATE children SET user_id = $1, updated_by = $2, updated_at = NOW() WHERE user_id = $3 AND deleted_at IS NULL',
+      [fallbackUserId, parentUserId, parentUserId]
+    );
+    return;
+  }
+  await query(
+    `UPDATE children SET user_id = $1, updated_by = $2, updated_at = NOW()
+     WHERE user_id = $3 AND deleted_at IS NULL AND id != ALL($4::uuid[])`,
+    [fallbackUserId, parentUserId, parentUserId, childIds]
+  );
+  await assignChildrenToUser(childIds, parentUserId);
+}
+
 export function canAccessChild(childUserId: string, requestUserId: string, role: string): boolean {
   if (role === 'admin' || role === 'therapist') return true;
   return childUserId === requestUserId;

@@ -87,11 +87,13 @@ class SessionsRepository {
 
   static SessionUserInfo? _userFromJson(Map<String, dynamic>? u) {
     if (u == null || u['id'] == null) return null;
+    final mobileRaw = u['mobileNumber'] ?? u['mobile_number'];
     return SessionUserInfo(
       id: u['id'] as String,
       fullName: u['fullName'] as String? ?? '',
       email: u['email'] as String? ?? '',
       title: u['title'] as String?,
+      mobileNumber: mobileRaw != null ? mobileRaw as String? : null,
     );
   }
 
@@ -139,6 +141,28 @@ class SessionsRepository {
   Future<SessionCommentEntity> addComment(String sessionId, String comment) async {
     try {
       final data = await _api.post<Map<String, dynamic>>('/api/sessions/$sessionId/comments', {'comment': comment});
+      final m = data!['comment'] as Map<String, dynamic>;
+      final u = m['user'] as Map<String, dynamic>?;
+      return SessionCommentEntity(
+        id: m['id'] as String,
+        sessionId: m['sessionId'] as String,
+        userId: m['userId'] as String,
+        comment: m['comment'] as String,
+        createdAt: DateTime.parse(m['createdAt'] as String),
+        userFullName: u?['fullName'] as String?,
+        userEmail: u?['email'] as String?,
+      );
+    } on DioException catch (e) {
+      throw _handle(e);
+    }
+  }
+
+  Future<SessionCommentEntity> updateComment(String sessionId, String commentId, String comment) async {
+    try {
+      final data = await _api.patch<Map<String, dynamic>>(
+        '/api/sessions/$sessionId/comments/$commentId',
+        {'comment': comment},
+      );
       final m = data!['comment'] as Map<String, dynamic>;
       final u = m['user'] as Map<String, dynamic>?;
       return SessionCommentEntity(

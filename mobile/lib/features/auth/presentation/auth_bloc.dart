@@ -30,7 +30,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const AuthState.loading());
     try {
       final result = await _repo.register(e.email, e.password, e.fullName, e.role);
-      emit(AuthState.authenticated(result.user, result.token));
+      if (result.token != null) {
+        emit(AuthState.authenticated(result.user, result.token!));
+      } else {
+        emit(AuthState.registrationPendingApproval(result.user));
+      }
     } catch (err) {
       emit(AuthState.failure(err is Exception ? err.toString() : 'Registration failed'));
     }

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as sessionsService from './sessions.service';
 import * as childrenService from '../children/children.service';
 import { createEmbeddingForSession } from '../ai/ai.service';
+import * as notificationsEmit from '../notifications/notifications.emit';
 
 function toSessionDto(s: sessionsService.SessionRow) {
   return {
@@ -19,15 +20,22 @@ function toSessionDto(s: sessionsService.SessionRow) {
   };
 }
 
-function toSessionDtoWithUser(s: sessionsService.SessionWithUserRow) {
+function toSessionDtoWithUser(s: sessionsService.SessionWithUserRow, requesterRole?: string) {
   const base = toSessionDto(s);
   const createdByUser =
     s._cb_id != null
       ? { id: s._cb_id, fullName: s._cb_full_name ?? '', email: s._cb_email ?? '', title: s._cb_title ?? null }
       : undefined;
+  const showTherapistMobile = requesterRole !== 'parent' || s._th_show_mobile_to_parents;
   const therapistUser =
     s._th_id != null
-      ? { id: s._th_id, fullName: s._th_full_name ?? '', email: s._th_email ?? '', title: s._th_title ?? null }
+      ? {
+          id: s._th_id,
+          fullName: s._th_full_name ?? '',
+          email: s._th_email ?? '',
+          title: s._th_title ?? null,
+          mobileNumber: showTherapistMobile && s._th_mobile_number ? s._th_mobile_number : undefined,
+        }
       : undefined;
   const updatedByUser =
     s._ub_id != null
@@ -50,7 +58,7 @@ export async function listByChild(req: Request, res: Response): Promise<void> {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
   const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
   const { rows: sessions, total } = await sessionsService.findByChildIdWithUser(childId, { limit, offset });
-  res.json({ sessions: sessions.map(toSessionDtoWithUser), total, limit, offset });
+  res.json({ sessions: sessions.map((s) => toSessionDtoWithUser(s, req.user!.role)), total, limit, offset });
 }
 
 export async function getOne(req: Request, res: Response): Promise<void> {
@@ -65,7 +73,7 @@ export async function getOne(req: Request, res: Response): Promise<void> {
     res.status(403).json({ error: 'Access denied' });
     return;
   }
-  res.json({ session: toSessionDtoWithUser(session) });
+  res.json({ session: toSessionDtoWithUser(session, req.user!.role) });
 }
 
 export async function create(req: Request, res: Response): Promise<void> {
@@ -98,8 +106,18 @@ export async function create(req: Request, res: Response): Promise<void> {
       console.error('Failed to create session embedding:', e);
     }
   }
+  const childName = `${child.first_name} ${child.last_name}`.trim() || 'Child';
+  notificationsEmit.notifySessionLogged({
+    sessionId: session.id,
+    childId: child.id,
+    childName,
+    sessionDate,
+    createdByUserId: req.user!.userId,
+    createdByRole: req.user!.role,
+    therapistId: session.therapist_id,
+  }).catch((err) => console.error('[notifications] notifySessionLogged failed:', err));
   const withUser = await sessionsService.findByIdWithUser(session.id);
-  res.status(201).json({ session: withUser ? toSessionDtoWithUser(withUser) : toSessionDto(session) });
+  res.status(201).json({ session: withUser ? toSessionDtoWithUser(withUser, req.user!.role) : toSessionDto(session) });
 }
 
 export async function update(req: Request, res: Response): Promise<void> {
@@ -127,7 +145,7 @@ export async function update(req: Request, res: Response): Promise<void> {
     return;
   }
   const withUser = await sessionsService.findByIdWithUser(updated.id);
-  res.json({ session: withUser ? toSessionDtoWithUser(withUser) : toSessionDto(updated) });
+  res.json({ session: withUser ? toSessionDtoWithUser(withUser, req.user!.role) : toSessionDto(updated) });
 }
 
 export async function remove(req: Request, res: Response): Promise<void> {
@@ -166,10 +184,6 @@ export async function listComments(req: Request, res: Response): Promise<void> {
 }
 
 export async function addComment(req: Request, res: Response): Promise<void> {
-  if (req.user!.role !== 'parent') {
-    res.status(403).json({ error: 'Only parents can add notes on a session' });
-    return;
-  }
   const { id } = req.params;
   const allowed = await sessionsService.canAccessSession(id, req.user!.userId, req.user!.role);
   if (!allowed) {
@@ -182,6 +196,20 @@ export async function addComment(req: Request, res: Response): Promise<void> {
     return;
   }
   const created = await sessionsService.addSessionComment(id, req.user!.userId, comment.trim());
+  if (req.user!.role === 'parent') {
+    notificationsEmit.notifyParentCommentOnSession({
+      sessionId: id,
+      parentName: created._u_full_name || 'A parent',
+      commentSnippet: comment.trim(),
+    }).catch((err) => console.error('[notifications] notifyParentCommentOnSession failed:', err));
+  } else if (req.user!.role === 'therapist' || req.user!.role === 'admin') {
+    notificationsEmit.notifyStaffCommentOnSession({
+      sessionId: id,
+      authorName: created._u_full_name || (req.user!.role === 'admin' ? 'An admin' : 'The therapist'),
+      authorRole: req.user!.role,
+      commentSnippet: comment.trim(),
+    }).catch((err) => console.error('[notifications] notifyStaffCommentOnSession failed:', err));
+  }
   res.status(201).json({
     comment: {
       id: created.id,
@@ -190,6 +218,35 @@ export async function addComment(req: Request, res: Response): Promise<void> {
       comment: created.comment,
       createdAt: created.created_at,
       user: { id: created._u_id, fullName: created._u_full_name, email: created._u_email },
+    },
+  });
+}
+
+export async function updateComment(req: Request, res: Response): Promise<void> {
+  const { id: sessionId, commentId } = req.params;
+  const allowed = await sessionsService.canAccessSession(sessionId, req.user!.userId, req.user!.role);
+  if (!allowed) {
+    res.status(403).json({ error: 'Access denied' });
+    return;
+  }
+  const { comment } = req.body;
+  if (!comment || typeof comment !== 'string' || !comment.trim()) {
+    res.status(400).json({ error: 'Comment text is required' });
+    return;
+  }
+  const updated = await sessionsService.updateSessionComment(commentId, req.user!.userId, comment.trim());
+  if (!updated) {
+    res.status(404).json({ error: 'Comment not found or you can only edit your own notes' });
+    return;
+  }
+  res.json({
+    comment: {
+      id: updated.id,
+      sessionId: updated.session_id,
+      userId: updated.user_id,
+      comment: updated.comment,
+      createdAt: updated.created_at,
+      user: { id: updated._u_id, fullName: updated._u_full_name, email: updated._u_email },
     },
   });
 }
