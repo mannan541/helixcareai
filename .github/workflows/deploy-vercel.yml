@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: npm install --global vercel@49.2.0
 
       - name: Pull Vercel env (backend)
         working-directory: backend
@@ -79,7 +79,7 @@ jobs:
         run: |
           # Ensure .env exists for asset bundle; use production API URL
           cp .env.production .env 2>/dev/null || true
-          if [ ! -f .env ]; then echo 'API_BASE_URL=https://hlixacareai.vercel.app' > .env; fi
+          if [ ! -f .env ]; then echo 'API_BASE_URL=https://helixcareai.vercel.app' > .env; fi
 
       - name: Install dependencies
         working-directory: mobile
@@ -90,7 +90,7 @@ jobs:
         run: flutter build web --release
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: npm install --global vercel@49.2.0
 
       - name: Pull Vercel env (frontend)
         working-directory: mobile

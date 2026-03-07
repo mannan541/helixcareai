@@ -3,7 +3,7 @@
   "info": { "title": "HelixCareAI API", "version": "1.0.0", "description": "Autism therapy management API" },
   "servers": [
     { "url": "http://localhost:3000", "description": "Local" },
-    { "url": "https://hlixacareai.vercel.app", "description": "Production" }
+    { "url": "https://helixcareai.vercel.app", "description": "Production" }
   ],
   "paths": {
     "/health": {

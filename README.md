@@ -147,7 +147,7 @@ git push -u origin dev
 | `VERCEL_PROJECT_ID` | **Backend** project ID. After `cd backend && npx vercel link`, see `.vercel/project.json` (or Project Settings → General) |
 | `VERCEL_FRONTEND_PROJECT_ID` | **Frontend** (Flutter web) project ID. Create a second Vercel project (e.g. same repo, root dir `mobile`, or “Other” framework), then copy its Project ID from Settings → General. Required for the "Deploy Frontend" job — without it that job fails and only the backend deploy runs. |
 
-You need **two Vercel projects**: one for the API (backend) and one for the web app (mobile). See below to link mobile.
+You need **two Vercel projects**: one for the API (backend) and one for the web app (mobile). For the **backend** project, set **Root Directory** to **`backend`** in Project Settings → General (otherwise the build fails with `Cannot read properties of undefined (reading 'fsPath')`). See below to link mobile.
 
 ### Link mobile (Flutter web) to Vercel — create new project & get IDs
 
@@ -175,7 +175,7 @@ You need **two Vercel projects**: one for the API (backend) and one for the web 
    - **Set up and deploy?** → **Y**
    - **Which scope?** → choose the same team/account as your backend.
    - **Link to existing project?** → **N** (we want a new project).
-   - **What’s your project’s name?** → e.g. `helixcareai-web` or `hlixcareai-mobile`.
+   - **What’s your project’s name?** → e.g. `HelixCareAI-web` or `HelixCareAI-mobile`.
 3. After linking, the CLI creates `mobile/.vercel/project.json`. To see your **Project ID** and **Org ID**:
    ```bash
    cat mobile/.vercel/project.json
@@ -190,7 +190,7 @@ From your existing backend link, **Org ID** is: `team_aumvi1YqIjR9fk4koGCgW5E9`.
 The app uses **PostgreSQL with pgvector** (for RAG embeddings). Use a Postgres integration from the Vercel Marketplace so the backend gets a connection string automatically.
 
 1. **Add Postgres to your backend project**
-   - Open [Vercel Dashboard](https://vercel.com) → your **backend** project (e.g. hlixacareai) → **Storage** tab (or **Integrations**).
+   - Open [Vercel Dashboard](https://vercel.com) → your **backend** project (e.g. HelixCareAI or helixcareai) → **Storage** tab (or **Integrations**).
    - Click **Create Database** / **Add Integration** and choose a **Postgres** provider (e.g. [Neon](https://vercel.com/marketplace/neon) — recommended; Vercel Postgres was migrated to Neon).
    - Connect it to this project. Vercel will inject **`POSTGRES_URL`** (and optionally `POSTGRES_URL_NON_POOLING`) into the project. The backend reads `POSTGRES_URL` when set.
 
@@ -227,14 +227,17 @@ After deploy, the API base URL is `https://<your-project>.vercel.app`. Use it as
 
 ### Production (Vercel) checklist
 
-**Backend project** (e.g. hlixacareai): In **Settings → Environment Variables**, set for **Production** (and Preview if needed):
+**Backend project** (e.g. HelixCareAI or helixcareai):
+
+1. **Root Directory (required):** In **Settings → General**, set **Root Directory** to **`backend`**. If this is left empty, Vercel runs the build from the repo root and you may see `Error: Cannot read properties of undefined (reading 'fsPath')`. Apply and redeploy.
+2. **Environment Variables:** In **Settings → Environment Variables**, set for **Production** (and Preview if needed):
 
 - **POSTGRES_URL** — Injected automatically if you added Neon/Postgres from Storage/Integrations. Otherwise add the connection string.
 - **JWT_SECRET** — A long random string (e.g. from a password generator).
 - **OPENAI_API_KEY** — Your OpenAI API key (for RAG/chat).
 - **EMBEDDING_DIMENSION** — `1536`.
 
-**Frontend project** (e.g. helixcareaifrontend): No env vars required for the app to run; the production API URL is baked in at build time from `mobile/.env.production`. Optionally set **API_BASE_URL** in Vercel if you ever build from the dashboard.
+**Frontend project** (e.g. HelixCareAI-frontend): No env vars required for the app to run; the production API URL is baked in at build time from `mobile/.env.production`. Optionally set **API_BASE_URL** in Vercel if you ever build from the dashboard.
 
 ## License
 

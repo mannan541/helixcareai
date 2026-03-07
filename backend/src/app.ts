@@ -23,7 +23,7 @@ app.use(
     origin: (origin, cb) => {
       const allowed =
         !origin ||
-        /^https:\/\/(helixcareaifrontend|mobile|hlixacareai)(-\w+)?\.vercel\.app$/i.test(origin) ||
+        /^https:\/\/(helixcareaifrontend|mobile|helixcareai)(-\w+)?\.vercel\.app$/i.test(origin) ||
         /^http:\/\/localhost(:\d+)?$/i.test(origin) ||
         /^http:\/\/127\.0\.0\.1(:\d+)?$/i.test(origin);
       cb(null, allowed ? origin || true : false);
