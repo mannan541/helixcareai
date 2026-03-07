@@ -10,11 +10,16 @@ const _therapistTitleOptions = [
   'Other',
 ];
 
+const _parentTitleOptions = ['Mother', 'Father', 'Other'];
+
 class AddUserScreen extends StatefulWidget {
-  const AddUserScreen({super.key, this.therapistOnly = false});
+  const AddUserScreen({super.key, this.therapistOnly = false, this.initialRole});
 
   /// When true, title is "Add therapist", role is fixed to therapist, and on success we pop with the created user.
   final bool therapistOnly;
+
+  /// When [therapistOnly] is false, pre-select this role ('therapist' or 'parent'). Defaults to 'therapist'.
+  final String? initialRole;
 
   @override
   State<AddUserScreen> createState() => _AddUserScreenState();
@@ -25,8 +30,10 @@ class _AddUserScreenState extends State<AddUserScreen> {
   final _emailController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _titleOtherController = TextEditingController();
+  final _parentTitleOtherController = TextEditingController();
   late String _role;
   String _therapistTitle = _therapistTitleOptions.first;
+  String _parentTitle = _parentTitleOptions.first;
   final Set<String> _selectedChildIds = {};
   List<ChildEntity> _children = [];
   bool _childrenLoading = false;
@@ -35,7 +42,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
   @override
   void initState() {
     super.initState();
-    _role = widget.therapistOnly ? 'therapist' : 'therapist';
+    _role = widget.therapistOnly
+        ? 'therapist'
+        : (widget.initialRole == 'parent' ? 'parent' : 'therapist');
     if (!widget.therapistOnly) _loadChildren();
   }
 
@@ -57,6 +66,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
     _emailController.dispose();
     _fullNameController.dispose();
     _titleOtherController.dispose();
+    _parentTitleOtherController.dispose();
     super.dispose();
   }
 
@@ -142,6 +152,26 @@ class _AddUserScreenState extends State<AddUserScreen> {
             ],
             if (_role == 'parent') ...[
               const SizedBox(height: 16),
+              const Text('Title', style: TextStyle(fontWeight: FontWeight.w500)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _parentTitle,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+                items: _parentTitleOptions.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                onChanged: (v) => setState(() => _parentTitle = v ?? _parentTitleOptions.first),
+              ),
+              if (_parentTitle == 'Other') ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _parentTitleOtherController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title (other)',
+                    hintText: 'Enter custom title',
+                  ),
+                  validator: (v) => _parentTitle == 'Other' && (v == null || v.trim().isEmpty) ? 'Required when Other is selected' : null,
+                ),
+              ],
+              const SizedBox(height: 16),
               const Text('Associate with child(ren)', style: TextStyle(fontWeight: FontWeight.w500)),
               const SizedBox(height: 8),
               if (_childrenLoading)
@@ -182,6 +212,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
       if (role == 'therapist') {
         title = _therapistTitle == 'Other' ? _titleOtherController.text.trim() : _therapistTitle;
         if (title.isEmpty) title = null;
+      } else if (role == 'parent') {
+        title = _parentTitle == 'Other' ? _parentTitleOtherController.text.trim() : _parentTitle;
+        if (title.isEmpty) title = null;
       }
       final user = await authRepository.createUserAsAdmin(
         email: _emailController.text.trim(),
@@ -195,7 +228,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
       Navigator.of(context).pop(user);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _loading = false);

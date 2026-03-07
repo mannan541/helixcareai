@@ -89,10 +89,14 @@ class _RegisterViewState extends State<_RegisterView> {
                 const SizedBox(height: 24),
                 BlocConsumer<AuthBloc, AuthState>(
                   listener: (context, state) {
-                    if (state.status == AuthStatus.authenticated) {
-                      Navigator.of(context).pushReplacementNamed('/children');
+                    if (state.status == AuthStatus.authenticated && state.user != null) {
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/dashboard',
+                        (route) => false,
+                        arguments: state.user,
+                      );
                     } else if (state.status == AuthStatus.failure && state.errorMessage != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.errorMessage!)));
                     }
                   },
                   builder: (context, state) {

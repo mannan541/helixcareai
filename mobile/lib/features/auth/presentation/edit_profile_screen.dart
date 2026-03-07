@@ -55,7 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Edit profile')),
         body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(_error ?? 'Could not load profile'),
+          SelectableText(_error ?? 'Could not load profile'),
           const SizedBox(height: 16),
           TextButton(onPressed: () => _loadUser(), child: const Text('Retry')),
         ])),
@@ -114,7 +114,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(e.toString())));
       }
     }
   }

@@ -14,7 +14,13 @@ class SessionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = ModalRoute.of(context)!.settings.arguments as ChildEntity;
+    final child = ModalRoute.of(context)?.settings.arguments;
+    if (child is! ChildEntity) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Sessions')),
+        body: const Center(child: Text('Select a child from the list first.')),
+      );
+    }
     return BlocProvider(
       create: (_) => SessionsBloc(sessionsRepository)..add(SessionsLoadRequested(child.id)),
       child: _SessionsView(child: child),
@@ -52,7 +58,7 @@ class _SessionsViewState extends State<_SessionsView> {
       body: BlocConsumer<SessionsBloc, SessionsState>(
         listener: (context, state) {
           if (state.error != null) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!)));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.error!)));
           }
         },
         builder: (context, state) {
@@ -64,7 +70,7 @@ class _SessionsViewState extends State<_SessionsView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(state.error!, textAlign: TextAlign.center),
+                  SelectableText(state.error!, textAlign: TextAlign.center),
                   TextButton(
                     onPressed: () => context.read<SessionsBloc>().add(SessionsLoadRequested(widget.child.id)),
                     child: const Text('Retry'),

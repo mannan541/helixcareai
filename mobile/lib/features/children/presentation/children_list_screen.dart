@@ -16,15 +16,32 @@ class ChildrenListScreen extends StatelessWidget {
   }
 }
 
-class _ChildrenListView extends StatelessWidget {
+class _ChildrenListView extends StatefulWidget {
   const _ChildrenListView();
+
+  @override
+  State<_ChildrenListView> createState() => _ChildrenListViewState();
+}
+
+class _ChildrenListViewState extends State<_ChildrenListView> {
+  bool _canAddChild = false;
+
+  @override
+  void initState() {
+    super.initState();
+    authRepository.me().then((user) {
+      if (mounted) setState(() {
+        _canAddChild = user?.isAdmin == true || user?.isTherapist == true;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<ChildrenBloc, ChildrenState>(
         listener: (context, state) {
           if (state.error != null) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!)));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.error!)));
           }
         },
         builder: (context, state) {
@@ -36,7 +53,7 @@ class _ChildrenListView extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(state.error!, textAlign: TextAlign.center),
+                  SelectableText(state.error!, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => context.read<ChildrenBloc>().add(const ChildrenLoadRequested()),
@@ -53,12 +70,14 @@ class _ChildrenListView extends StatelessWidget {
                   const Icon(Icons.child_care, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
                   const Text('No children yet'),
-                  const SizedBox(height: 8),
-                  FilledButton.icon(
-                    onPressed: () => _showAddChild(context),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add child'),
-                  ),
+                  if (_canAddChild) ...[
+                    const SizedBox(height: 8),
+                    FilledButton.icon(
+                      onPressed: () => _showAddChild(context),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add child'),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -121,7 +140,7 @@ class _ChildrenListView extends StatelessWidget {
               ],
             ),
             body: body,
-            floatingActionButton: state.children.isNotEmpty
+            floatingActionButton: state.children.isNotEmpty && _canAddChild
                 ? FloatingActionButton(
                     onPressed: () => _showAddChild(context),
                     child: const Icon(Icons.add),

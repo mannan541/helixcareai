@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'features/auth/domain/user_entity.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
 import 'features/auth/presentation/edit_profile_screen.dart';
@@ -7,6 +8,9 @@ import 'features/children/presentation/children_list_screen.dart';
 import 'features/sessions/presentation/sessions_screen.dart';
 import 'features/chat/presentation/chat_screen.dart';
 import 'features/admin/presentation/add_user_screen.dart';
+import 'features/admin/presentation/edit_user_screen.dart';
+import 'features/admin/presentation/users_list_screen.dart';
+import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/analytics/presentation/analytics_screen.dart';
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
@@ -41,11 +45,40 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
       routes: {
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
+        '/dashboard': (ctx) {
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          return DashboardScreen(initialUser: args is UserEntity ? args : null);
+        },
         '/children': (_) => const ChildrenListScreen(),
+        '/users': (ctx) {
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          return UsersListScreen(roleFilter: args is String ? args : null);
+        },
         '/edit_profile': (_) => const EditProfileScreen(),
-        '/add_user': (_) => const AddUserScreen(),
+        '/add_user': (ctx) {
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          final therapistOnly = args == true || args == 'therapist';
+          final initialRole = args == 'parent' ? 'parent' : null;
+          return AddUserScreen(therapistOnly: therapistOnly, initialRole: initialRole);
+        },
+        '/user_edit': (ctx) {
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          if (args is! UserEntity) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Error')),
+              body: const Center(child: Text('Invalid navigation. Select a user from the list.')),
+            );
+          }
+          return EditUserScreen(user: args);
+        },
         '/child_detail': (ctx) {
-          final args = ModalRoute.of(ctx)!.settings.arguments as ChildDetailArgs;
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          if (args is! ChildDetailArgs) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Error')),
+              body: const Center(child: Text('Invalid navigation. Go back and select a child.')),
+            );
+          }
           return ChildDetailScreen(child: args.child, childrenBloc: args.childrenBloc);
         },
         '/sessions': (_) => const SessionsScreen(),

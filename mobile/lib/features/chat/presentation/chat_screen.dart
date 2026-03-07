@@ -9,7 +9,13 @@ class ChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = ModalRoute.of(context)!.settings.arguments as ChildEntity;
+    final child = ModalRoute.of(context)?.settings.arguments;
+    if (child is! ChildEntity) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Chat')),
+        body: const Center(child: Text('Select a child from the list first.')),
+      );
+    }
     return BlocProvider(
       create: (_) => ChatBloc(chatRepository)..add(ChatLoadHistoryRequested(child.id)),
       child: _ChatView(child: child),
@@ -44,7 +50,7 @@ class _ChatViewState extends State<_ChatView> {
       body: BlocConsumer<ChatBloc, ChatState>(
         listener: (context, state) {
           if (state.error != null) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!)));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.error!)));
           }
         },
         builder: (context, state) {
@@ -56,7 +62,7 @@ class _ChatViewState extends State<_ChatView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(state.error!, textAlign: TextAlign.center),
+                  SelectableText(state.error!, textAlign: TextAlign.center),
                   TextButton(
                     onPressed: () => context.read<ChatBloc>().add(ChatLoadHistoryRequested(widget.child.id)),
                     child: const Text('Retry'),

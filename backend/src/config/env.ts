@@ -1,6 +1,12 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 
 dotenv.config();
+const devLocal = path.resolve(process.cwd(), '.env.development.local');
+if (fs.existsSync(devLocal)) {
+  dotenv.config({ path: devLocal, override: true });
+}
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV ?? 'development',

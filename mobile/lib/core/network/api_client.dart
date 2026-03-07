@@ -38,19 +38,47 @@ class ApiClient {
     _token = token;
   }
 
+  static bool _isHtmlResponse(dynamic data) =>
+      data is String && (data.startsWith('<!') || data.startsWith('<'));
+
+  static T _ensureJson<T>(dynamic data, int? statusCode) {
+    if (data is! T) {
+      if (_isHtmlResponse(data)) {
+        throw DioException(
+          requestOptions: RequestOptions(path: ''),
+          response: Response(requestOptions: RequestOptions(path: ''), statusCode: statusCode, data: data),
+          type: DioExceptionType.badResponse,
+          error: 'Server returned an error page instead of JSON. Restart the backend or redeploy.',
+        );
+      }
+      throw DioException(
+        requestOptions: RequestOptions(path: ''),
+        response: Response(requestOptions: RequestOptions(path: ''), statusCode: statusCode, data: data),
+        type: DioExceptionType.badResponse,
+        error: 'Unexpected response type',
+      );
+    }
+    return data;
+  }
+
   Future<T> get<T>(String path, {Map<String, dynamic>? queryParameters}) async {
     final r = await _dio.get<dynamic>(path, queryParameters: queryParameters);
-    return r.data as T;
+    return _ensureJson<T>(r.data, r.statusCode);
   }
 
   Future<T> post<T>(String path, [dynamic data]) async {
     final r = await _dio.post<dynamic>(path, data: data);
-    return r.data as T;
+    return _ensureJson<T>(r.data, r.statusCode);
   }
 
   Future<T> patch<T>(String path, [dynamic data]) async {
     final r = await _dio.patch<dynamic>(path, data: data);
-    return r.data as T;
+    return _ensureJson<T>(r.data, r.statusCode);
+  }
+
+  Future<T> put<T>(String path, [dynamic data]) async {
+    final r = await _dio.put<dynamic>(path, data: data);
+    return _ensureJson<T>(r.data, r.statusCode);
   }
 
   Future<void> delete(String path) async {

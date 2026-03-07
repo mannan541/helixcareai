@@ -76,7 +76,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              SelectableText(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               FilledButton(onPressed: () => _load(context), child: const Text('Retry')),
             ],

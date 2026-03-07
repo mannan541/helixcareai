@@ -40,6 +40,9 @@ String? _therapyTitleFromTherapistTitle(String? therapistTitle) {
 }
 
 class _SessionFormScreenState extends State<SessionFormScreen> {
+  /// Last therapist selected in the session form (for new sessions).
+  static UserEntity? _lastSelectedTherapist;
+
   final _formKey = GlobalKey<FormState>();
   late DateTime _date;
   final _durationController = TextEditingController();
@@ -67,6 +70,12 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         title: u.title,
       );
       _therapyTitle = metrics['therapyTitle'] as String? ?? _therapyTitleFromTherapistTitle(u.title);
+    } else if (session?.therapistId != null) {
+      _therapyTitle = metrics['therapyTitle'] as String?;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _resolveTherapistById(session!.therapistId!));
+    } else if (session == null && _lastSelectedTherapist != null) {
+      _selectedTherapist = _lastSelectedTherapist;
+      _therapyTitle = metrics['therapyTitle'] as String? ?? _therapyTitleFromTherapistTitle(_lastSelectedTherapist!.title);
     } else {
       _selectedTherapist = null;
       _therapyTitle = metrics['therapyTitle'] as String?;
@@ -80,6 +89,26 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       _metricControllers['focus'] = TextEditingController();
       _metricControllers['communication'] = TextEditingController();
     }
+  }
+
+  Future<void> _resolveTherapistById(String therapistId) async {
+    try {
+      final res = await authRepository.getTherapists(limit: 500, offset: 0);
+      UserEntity? u;
+      for (final t in res.users) {
+        if (t.id == therapistId) {
+          u = t;
+          break;
+        }
+      }
+      if (u != null && mounted) {
+        final therapist = u;
+        setState(() {
+          _selectedTherapist = therapist;
+          if (_therapyTitle == null) _therapyTitle = _therapyTitleFromTherapistTitle(therapist?.title);
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -269,6 +298,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                                   subtitle: Text(u.email),
                                   onTap: () {
                                     final therapyFromTitle = _therapyTitleFromTherapistTitle(u.title);
+                                    _lastSelectedTherapist = u;
                                     setState(() {
                                       _selectedTherapist = u;
                                       if (therapyFromTitle != null) _therapyTitle = therapyFromTitle;
@@ -299,6 +329,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         ),
       );
       if (newTherapist != null && mounted) {
+        _lastSelectedTherapist = newTherapist;
         setState(() => _selectedTherapist = newTherapist);
       }
     }

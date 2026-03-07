@@ -74,7 +74,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e is Exception ? e.toString() : 'Failed to add comment')),
+          SnackBar(content: SelectableText(e is Exception ? e.toString() : 'Failed to add comment')),
         );
       }
     }

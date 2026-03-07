@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { body, query } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { authMiddleware } from '../../middleware/auth';
 import { requireAdmin } from '../../middleware/roles';
 import { asyncHandler } from '../../middleware/asyncHandler';
@@ -9,6 +9,8 @@ import * as adminController from './admin.controller';
 const router = Router();
 router.use(authMiddleware);
 router.use(requireAdmin);
+
+router.get('/dashboard/counts', asyncHandler(adminController.getDashboardCounts));
 
 router.post(
   '/users',
@@ -33,5 +35,18 @@ router.get(
   ]),
   asyncHandler(adminController.listUsers)
 );
+
+const updateUserValidations = [
+  param('id').isUUID(),
+  body('fullName').optional().trim().notEmpty(),
+  body('title').optional({ nullable: true }).custom((val) => val === null || typeof val === 'string'),
+  body('password').optional().isString().isLength({ min: 8 }),
+];
+
+router
+  .route('/users/:id')
+  .get(validate([param('id').isUUID()]), asyncHandler(adminController.getUser))
+  .put(validate(updateUserValidations), asyncHandler(adminController.updateUser))
+  .patch(validate(updateUserValidations), asyncHandler(adminController.updateUser));
 
 export default router;

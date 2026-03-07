@@ -74,12 +74,34 @@ export async function findById(id: string): Promise<SessionRow | null> {
   return queryOne<SessionRow>('SELECT * FROM sessions WHERE id = $1 AND deleted_at IS NULL', [id]);
 }
 
+type UserInfoRow = { id: string; full_name: string; email: string; title: string | null };
+
+async function findUserByIdForSession(userId: string): Promise<UserInfoRow | null> {
+  const rows = await query<UserInfoRow>(
+    'SELECT id, full_name, email, title FROM users WHERE id = $1',
+    [userId]
+  );
+  return rows[0] ?? null;
+}
+
+function fillTherapistFromUser(row: SessionWithUserRow, u: UserInfoRow): void {
+  (row as Record<string, unknown>)._th_id = u.id;
+  (row as Record<string, unknown>)._th_full_name = u.full_name;
+  (row as Record<string, unknown>)._th_email = u.email;
+  (row as Record<string, unknown>)._th_title = u.title;
+}
+
 export async function findByIdWithUser(id: string): Promise<SessionWithUserRow | null> {
   const rows = await query<SessionWithUserRow>(
     `SELECT ${SESSION_COLS}, ${CB_COLS}, ${TH_COLS}, ${UB_COLS} ${SESSION_JOIN_USERS} WHERE s.id = $1${SESSION_NOT_DELETED}`,
     [id]
   );
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (row && row.therapist_id && row._th_id == null) {
+    const u = await findUserByIdForSession(row.therapist_id);
+    if (u) fillTherapistFromUser(row, u);
+  }
+  return row;
 }
 
 export async function findByChildId(
@@ -115,6 +137,20 @@ export async function findByChildIdWithUser(
     `SELECT ${SESSION_COLS}, ${CB_COLS}, ${TH_COLS}, ${UB_COLS} ${SESSION_JOIN_USERS} WHERE s.child_id = $1${SESSION_NOT_DELETED} ORDER BY s.session_date DESC, s.created_at DESC LIMIT $2 OFFSET $3`,
     [childId, limit, offset]
   );
+  const missingTherapistIds = [...new Set(rows.filter((r) => r.therapist_id && r._th_id == null).map((r) => r.therapist_id!))];
+  if (missingTherapistIds.length > 0) {
+    const userRows = await query<UserInfoRow>(
+      'SELECT id, full_name, email, title FROM users WHERE id = ANY($1)',
+      [missingTherapistIds]
+    );
+    const byId = new Map(userRows.map((u) => [u.id, u]));
+    for (const row of rows) {
+      if (row.therapist_id && row._th_id == null) {
+        const u = byId.get(row.therapist_id);
+        if (u) fillTherapistFromUser(row, u);
+      }
+    }
+  }
   return { rows, total };
 }
 
