@@ -185,6 +185,11 @@ You need **two Vercel projects**: one for the API (backend) and one for the web 
 **Your current backend IDs (same org for frontend)**  
 From your existing backend link, **Org ID** is: `team_aumvi1YqIjR9fk4koGCgW5E9`. Use this for `VERCEL_ORG_ID` in GitHub. The **new** frontend project will have a different **Project ID** — get it from the dashboard (Option A) or from `mobile/.vercel/project.json` after `vercel link` (Option B).
 
+**If you recreated the frontend project** (e.g. deleted and created a new one with **main** as production branch):  
+1. In Vercel → your **new** frontend project → **Settings** → **General** → copy the **Project ID**.  
+2. In GitHub → repo **Settings** → **Secrets and variables** → **Actions** → update **`VERCEL_FRONTEND_PROJECT_ID`** with this new Project ID.  
+3. Optionally, from the repo run `cd mobile && npx vercel link`, choose the new project, so `mobile/.vercel/project.json` is updated for local deploys.
+
 ## Database: Vercel Postgres (recommended)
 
 The app uses **PostgreSQL with pgvector** (for RAG embeddings). Use a Postgres integration from the Vercel Marketplace so the backend gets a connection string automatically.

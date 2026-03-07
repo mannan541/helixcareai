@@ -79,7 +79,7 @@ jobs:
         run: |
           # Ensure .env exists for asset bundle; use production API URL
           cp .env.production .env 2>/dev/null || true
-          if [ ! -f .env ]; then echo 'API_BASE_URL=https://helixcareai.vercel.app' > .env; fi
+          if [ ! -f .env ]; then echo 'API_BASE_URL=https://helixacareai.vercel.app' > .env; fi
 
       - name: Install dependencies
         working-directory: mobile
