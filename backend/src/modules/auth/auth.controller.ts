@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
 import { signToken } from './auth.service';
+import * as childrenService from '../children/children.service';
+import * as sessionsService from '../sessions/sessions.service';
 
 export async function listTherapists(req: Request, res: Response): Promise<void> {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
@@ -82,14 +84,47 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     res.status(401).json({ error: 'Not authenticated' });
     return;
   }
-  const { fullName, password } = req.body as { fullName?: string; password?: string };
+  const { fullName, password, currentPassword } = req.body as {
+    fullName?: string;
+    password?: string;
+    currentPassword?: string;
+  };
+  const newPassword = password && password.length > 0 ? password : undefined;
+  if (newPassword && req.user.role !== 'admin') {
+    if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length === 0) {
+      res.status(400).json({ error: 'Current password is required to set a new password' });
+      return;
+    }
+    const valid = await authService.verifyUserPassword(req.user.userId, currentPassword);
+    if (!valid) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+  }
   const updated = await authService.updateUser(req.user.userId, {
     fullName: fullName?.trim(),
-    password: password && password.length > 0 ? password : undefined,
+    password: newPassword,
   });
   if (!updated) {
     res.status(400).json({ error: 'Nothing to update' });
     return;
   }
   res.json({ user: { id: updated.id, email: updated.email, fullName: updated.full_name, role: updated.role, title: updated.title } });
+}
+
+/** Dashboard counts for therapist/parent: children count and sessions count (role-specific). */
+export async function getDashboardCounts(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: 'Not authenticated' });
+    return;
+  }
+  const { userId, role } = req.user;
+  const { total: children } = await childrenService.findByUserId(userId, role, { limit: 1, offset: 0 });
+  let sessions = 0;
+  if (role === 'therapist') {
+    sessions = await sessionsService.countByTherapistId(userId);
+  } else if (role === 'parent') {
+    sessions = await sessionsService.countForParentUserId(userId);
+  }
+  res.json({ children, sessions });
 }

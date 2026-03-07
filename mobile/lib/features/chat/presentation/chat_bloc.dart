@@ -29,24 +29,26 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     if (current.isLoading || current.error != null) return;
     if (e.question.trim().isEmpty) return;
     final previousMessages = current.messages;
-    emit(ChatState.sending(previousMessages));
+    final userMsg = ChatMessage(
+      id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
+      role: 'user',
+      content: e.question.trim(),
+      createdAt: DateTime.now(),
+    );
+    final messagesWithUser = [...previousMessages, userMsg];
+    emit(ChatState.sending(messagesWithUser));
     try {
       final answer = await _repo.ask(e.childId, e.question.trim());
-      final userMsg = ChatMessage(
-        id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
-        role: 'user',
-        content: e.question.trim(),
-        createdAt: DateTime.now(),
-      );
       final assistantMsg = ChatMessage(
         id: 'temp-a-${DateTime.now().millisecondsSinceEpoch}',
         role: 'assistant',
         content: answer,
         createdAt: DateTime.now(),
       );
-      emit(ChatState.loaded([...previousMessages, userMsg, assistantMsg]));
+      emit(ChatState.loaded([...messagesWithUser, assistantMsg]));
     } catch (err) {
-      emit(ChatState.failure(err is Exception ? err.toString() : 'Send failed'));
+      final msg = err is Exception ? err.toString() : 'Send failed';
+      emit(ChatState.sendFailed(messagesWithUser, msg));
     }
   }
 }

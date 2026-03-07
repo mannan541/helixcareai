@@ -28,6 +28,7 @@ router.post(
 );
 
 router.get('/me', authMiddleware, asyncHandler(authController.me));
+router.get('/dashboard/counts', authMiddleware, asyncHandler(authController.getDashboardCounts));
 router.get('/therapists', authMiddleware, asyncHandler(authController.listTherapists));
 
 router.patch(
@@ -35,6 +36,7 @@ router.patch(
   authMiddleware,
   validate([
     body('fullName').optional().trim().notEmpty(),
+    body('currentPassword').optional().isString(),
     body('password').optional().isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   ]),
   asyncHandler(authController.updateProfile)

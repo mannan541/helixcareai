@@ -20,4 +20,9 @@ export const env = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN ?? '7d',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
   EMBEDDING_DIMENSION: parseInt(process.env.EMBEDDING_DIMENSION ?? '1536', 10),
+  /** Local embedding service (Python FastAPI + sentence-transformers). */
+  EMBEDDING_SERVICE_URL: process.env.EMBEDDING_SERVICE_URL ?? 'http://localhost:8000',
+  /** Local Ollama API for RAG LLM. */
+  OLLAMA_URL: process.env.OLLAMA_URL ?? 'http://localhost:11434',
+  OLLAMA_MODEL: process.env.OLLAMA_MODEL ?? 'llama3',
 } as const;

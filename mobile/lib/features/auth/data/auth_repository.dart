@@ -89,6 +89,21 @@ class AuthRepository {
     }
   }
 
+  /// Therapist/parent: returns children count and sessions count (role-specific).
+  Future<UserDashboardCounts?> getDashboardCountsForUser() async {
+    try {
+      final data = await _api.get<Map<String, dynamic>>('/api/auth/dashboard/counts');
+      if (data == null) return null;
+      return UserDashboardCounts(
+        children: _parseInt(data['children']),
+        sessions: _parseInt(data['sessions']),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) return null;
+      throw _handleDio(e);
+    }
+  }
+
   static int _parseInt(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v;
@@ -175,11 +190,16 @@ class AuthRepository {
     }
   }
 
-  Future<UserEntity?> updateProfile({String? fullName, String? password}) async {
+  Future<UserEntity?> updateProfile({
+    String? fullName,
+    String? password,
+    String? currentPassword,
+  }) async {
     try {
       final body = <String, dynamic>{};
       if (fullName != null) body['fullName'] = fullName;
       if (password != null && password.isNotEmpty) body['password'] = password;
+      if (currentPassword != null && currentPassword.isNotEmpty) body['currentPassword'] = currentPassword;
       if (body.isEmpty) return null;
       final data = await _api.patch<Map<String, dynamic>>('/api/auth/profile', body);
       final userData = data?['user'] as Map<String, dynamic>?;
@@ -249,6 +269,13 @@ class DashboardCounts {
   final int therapists;
   final int parents;
   final int totalUsers;
+}
+
+/// Dashboard counts for therapist/parent (children + sessions).
+class UserDashboardCounts {
+  UserDashboardCounts({required this.children, required this.sessions});
+  final int children;
+  final int sessions;
 }
 
 class UsersListResponse {

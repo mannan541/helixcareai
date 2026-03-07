@@ -43,6 +43,13 @@ class ChatState extends Equatable {
         messages = const [],
         error = msg;
 
+  /// Send failed but keep messages (e.g. user message stays visible, error in snackbar).
+  ChatState.sendFailed(List<ChatMessage> list, String msg)
+      : isLoading = false,
+        isSending = false,
+        messages = list,
+        error = msg;
+
   @override
   List<Object?> get props => [isLoading, isSending, messages, error];
 }

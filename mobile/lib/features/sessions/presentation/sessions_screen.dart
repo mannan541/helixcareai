@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import '../domain/session_entity.dart';
 import '../data/sessions_repository.dart';
 import '../../children/domain/child_entity.dart';
@@ -39,6 +39,7 @@ class _SessionsView extends StatefulWidget {
 
 class _SessionsViewState extends State<_SessionsView> {
   bool? _canEdit;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _SessionsViewState extends State<_SessionsView> {
     authRepository.me().then((user) {
       if (mounted) setState(() {
         _canEdit = user != null && (user.isAdmin || user.isTherapist);
+        _currentUserId = user?.id;
       });
     });
   }
@@ -120,15 +122,53 @@ class _SessionsViewState extends State<_SessionsView> {
                     );
                   }
                   final s = list[i];
+                  final isMySession = _currentUserId != null &&
+                      s.therapistUser != null &&
+                      s.therapistUser!.id == _currentUserId;
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     child: ListTile(
-                      title: Text(DateFormat.yMMMd().format(s.sessionDate)),
-                      subtitle: Text(
-                        [
-                          if (s.durationMinutes != null) '${s.durationMinutes} min',
-                          if (s.notesText != null && s.notesText!.isNotEmpty) s.notesText,
-                        ].join(' • '),
+                      title: Row(
+                        children: [
+                          Expanded(child: Text(formatAppDate(s.sessionDate))),
+                          if (isMySession)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Your session',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            [
+                              if (s.durationMinutes != null) '${s.durationMinutes} min',
+                              if (s.notesText != null && s.notesText!.isNotEmpty) s.notesText,
+                            ].join(' • '),
+                          ),
+                          if (s.therapistUser != null && !isMySession)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                'Conducted by ${s.therapistUser!.fullName}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _openSessionDetailOrForm(context, s, canEdit),

@@ -40,6 +40,16 @@ export async function findUserById(id: string): Promise<Omit<UserRow, 'password_
   return user;
 }
 
+/** Verify that the given password matches the user's stored hash (for profile password change). */
+export async function verifyUserPassword(userId: string, password: string): Promise<boolean> {
+  const row = await queryOne<Pick<UserRow, 'password_hash'>>(
+    'SELECT password_hash FROM users WHERE id = $1 AND deleted_at IS NULL',
+    [userId]
+  );
+  if (!row) return false;
+  return verifyPassword(password, row.password_hash);
+}
+
 export type UserListItem = { id: string; email: string; full_name: string; role: string; title: string | null };
 
 export async function findUsers(opts: {

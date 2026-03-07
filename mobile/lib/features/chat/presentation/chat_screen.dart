@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../children/domain/child_entity.dart';
 import 'chat_bloc.dart';
 
@@ -98,9 +99,9 @@ class _ChatViewState extends State<_ChatView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(m.content, style: const TextStyle(fontSize: 15)),
+                        SelectableText(m.content, style: const TextStyle(fontSize: 15)),
                         const SizedBox(height: 4),
-                        Text(
+                        SelectableText(
                           _formatTime(m.createdAt),
                           style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color),
                         ),
@@ -147,7 +148,7 @@ class _ChatViewState extends State<_ChatView> {
   }
 
   String _formatTime(DateTime d) {
-    return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    return formatAppDateTime(d);
   }
 
   void _send(BuildContext context) {

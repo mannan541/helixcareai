@@ -6,6 +6,7 @@ class ChildrenState extends Equatable {
   final List<ChildEntity> children;
   final int total;
   final String? error;
+  final String? search;
 
   const ChildrenState({
     required this.isLoading,
@@ -13,6 +14,7 @@ class ChildrenState extends Equatable {
     required this.children,
     this.total = 0,
     this.error,
+    this.search,
   });
 
   const ChildrenState.initial()
@@ -20,22 +22,24 @@ class ChildrenState extends Equatable {
         isLoadingMore = false,
         children = const [],
         total = 0,
-        error = null;
+        error = null,
+        search = null;
 
   const ChildrenState.loading()
       : isLoading = true,
         isLoadingMore = false,
         children = const [],
         total = 0,
-        error = null;
+        error = null,
+        search = null;
 
-  ChildrenState.loaded(List<ChildEntity> list, {this.total = 0})
+  ChildrenState.loaded(List<ChildEntity> list, {this.total = 0, this.search})
       : isLoading = false,
         isLoadingMore = false,
         children = list,
         error = null;
 
-  ChildrenState.loadingMore(List<ChildEntity> list, {this.total = 0})
+  ChildrenState.loadingMore(List<ChildEntity> list, {this.total = 0, this.search})
       : isLoading = false,
         isLoadingMore = true,
         children = list,
@@ -46,10 +50,11 @@ class ChildrenState extends Equatable {
         isLoadingMore = false,
         children = const [],
         total = 0,
-        error = msg;
+        error = msg,
+        search = null;
 
   bool get hasMore => children.length < total;
 
   @override
-  List<Object?> get props => [isLoading, isLoadingMore, children, total, error];
+  List<Object?> get props => [isLoading, isLoadingMore, children, total, error, search];
 }

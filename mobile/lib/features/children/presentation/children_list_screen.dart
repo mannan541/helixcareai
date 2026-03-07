@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import 'child_detail_screen.dart';
 import 'children_bloc.dart';
 
@@ -103,11 +104,17 @@ class _ChildrenListViewState extends State<_ChildrenListView> {
                       );
                     }
                     final c = list[i];
+                    final subtitleParts = <String>[
+                      if (c.childCode != null && c.childCode!.isNotEmpty) c.childCode!,
+                      if (c.dateOfBirth != null) 'DOB: ${formatAppDateFromString(c.dateOfBirth) ?? c.dateOfBirth}',
+                    ];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
                         title: Text(c.fullName),
-                        subtitle: c.dateOfBirth != null ? Text('DOB: ${c.dateOfBirth}') : null,
+                        subtitle: subtitleParts.isEmpty
+                            ? null
+                            : Text(subtitleParts.join(' • ')),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => Navigator.of(context).pushNamed(
                           '/child_detail',
@@ -127,6 +134,29 @@ class _ChildrenListViewState extends State<_ChildrenListView> {
           return Scaffold(
             appBar: AppBar(
               title: const Text('Children'),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(56),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search by child ID or name',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onSubmitted: (q) {
+                      context.read<ChildrenBloc>().add(ChildrenLoadRequested(search: q.isEmpty ? null : q));
+                    },
+                    onChanged: (q) {
+                      if (q.isEmpty) {
+                        context.read<ChildrenBloc>().add(const ChildrenLoadRequested(search: null));
+                      }
+                    },
+                  ),
+                ),
+              ),
               actions: [
                 _AddUserButton(),
                 IconButton(
@@ -171,21 +201,30 @@ class _ChildrenListViewState extends State<_ChildrenListView> {
   }
 
   void _showAddChild(BuildContext context) {
+    final bloc = context.read<ChildrenBloc>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => _AddChildSheet(
-        onSubmit: (firstName, lastName, dateOfBirth, notes, diagnosis, referredBy) {
-          context.read<ChildrenBloc>().add(ChildrenCreateRequested(
-                firstName: firstName,
-                lastName: lastName,
-                dateOfBirth: dateOfBirth,
-                notes: notes,
-                diagnosis: diagnosis,
-                referredBy: referredBy,
-              ));
-          Navigator.pop(ctx);
-        },
+      builder: (ctx) => BlocProvider.value(
+        value: bloc,
+        child: _AddChildSheet(
+          onSubmit: (data) {
+            bloc.add(ChildrenCreateRequested(
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  dateOfBirth: data.dateOfBirth,
+                  notes: data.notes,
+                  diagnosis: data.diagnosis,
+                  referredBy: data.referredBy,
+                  gender: data.gender,
+                  diagnosisType: data.diagnosisType,
+                  autismLevel: data.autismLevel,
+                  primaryLanguage: data.primaryLanguage,
+                  communicationType: data.communicationType,
+                  therapyStatus: data.therapyStatus,
+                ));
+          },
+        ),
       ),
     );
   }
@@ -218,8 +257,37 @@ class _AddUserButtonState extends State<_AddUserButton> {
   }
 }
 
+class _AddChildData {
+  final String firstName;
+  final String lastName;
+  final String? dateOfBirth;
+  final String? notes;
+  final String? diagnosis;
+  final String? referredBy;
+  final String? gender;
+  final String? diagnosisType; // ASD, ADHD, or custom when Other
+  final String? autismLevel;
+  final String? primaryLanguage;
+  final String? communicationType;
+  final String? therapyStatus;
+  _AddChildData({
+    required this.firstName,
+    required this.lastName,
+    this.dateOfBirth,
+    this.notes,
+    this.diagnosis,
+    this.referredBy,
+    this.gender,
+    this.diagnosisType,
+    this.autismLevel,
+    this.primaryLanguage,
+    this.communicationType,
+    this.therapyStatus,
+  });
+}
+
 class _AddChildSheet extends StatefulWidget {
-  final void Function(String firstName, String lastName, String? dateOfBirth, String? notes, String? diagnosis, String? referredBy) onSubmit;
+  final void Function(_AddChildData data) onSubmit;
 
   const _AddChildSheet({required this.onSubmit});
 
@@ -233,7 +301,23 @@ class _AddChildSheetState extends State<_AddChildSheet> {
   final _notes = TextEditingController();
   final _diagnosis = TextEditingController();
   final _referredBy = TextEditingController();
+  final _primaryLanguageOther = TextEditingController();
+  final _diagnosisTypeOther = TextEditingController();
   DateTime? _dob;
+  String? _gender;
+  String? _diagnosisType;
+  String? _primaryLanguage; // English, Urdu, Other
+  String? _autismLevel;
+  String? _communicationType;
+  String? _therapyStatus;
+  bool _saving = false;
+
+  static const List<String> _genderOptions = ['Male', 'Female', 'Other'];
+  static const List<String> _diagnosisTypeOptions = ['ASD', 'ADHD', 'Other'];
+  static const List<String> _primaryLanguageOptions = ['English', 'Urdu', 'Other'];
+  static const List<String> _autismLevelOptions = ['Level 1', 'Level 2', 'Level 3', 'Not specified'];
+  static const List<String> _communicationTypeOptions = ['Verbal', 'Non-verbal', 'Minimal', 'AAC', 'Other'];
+  static const List<String> _therapyStatusOptions = ['Active', 'On hold', 'Completed', 'Not started'];
 
   @override
   void dispose() {
@@ -242,14 +326,26 @@ class _AddChildSheetState extends State<_AddChildSheet> {
     _notes.dispose();
     _diagnosis.dispose();
     _referredBy.dispose();
+    _primaryLanguageOther.dispose();
+    _diagnosisTypeOther.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: SingleChildScrollView(
+    return BlocListener<ChildrenBloc, ChildrenState>(
+      listenWhen: (prev, curr) => _saving && prev.isLoading && !curr.isLoading,
+      listener: (context, state) {
+        if (state.error != null) {
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.error!)));
+        } else {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -261,8 +357,17 @@ class _AddChildSheetState extends State<_AddChildSheet> {
             const SizedBox(height: 12),
             TextField(controller: _ln, decoration: const InputDecoration(labelText: 'Last name')),
             const SizedBox(height: 12),
+            Text('Child code will be auto-generated (e.g. CH001)', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _gender,
+              decoration: const InputDecoration(labelText: 'Gender'),
+              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._genderOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              onChanged: (v) => setState(() => _gender = v),
+            ),
+            const SizedBox(height: 12),
             ListTile(
-              title: Text(_dob == null ? 'Date of birth (optional)' : 'DOB: ${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}'),
+              title: Text(_dob == null ? 'Date of birth (optional)' : 'DOB: ${formatAppDate(_dob!)}'),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
                 final picked = await showDatePicker(
@@ -281,6 +386,64 @@ class _AddChildSheetState extends State<_AddChildSheet> {
               maxLines: 1,
             ),
             const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _diagnosisType,
+              decoration: const InputDecoration(labelText: 'Diagnosis type'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('—')),
+                ..._diagnosisTypeOptions.map((o) => DropdownMenuItem(value: o, child: Text(o))),
+              ],
+              onChanged: (v) => setState(() => _diagnosisType = v),
+            ),
+            if (_diagnosisType == 'Other') ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _diagnosisTypeOther,
+                decoration: const InputDecoration(
+                  labelText: 'Diagnosis type (please specify)',
+                  hintText: 'e.g. Sensory processing disorder',
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _autismLevel,
+              decoration: const InputDecoration(labelText: 'Autism level'),
+              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._autismLevelOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              onChanged: (v) => setState(() => _autismLevel = v),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _primaryLanguage,
+              decoration: const InputDecoration(labelText: 'Primary language'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('—')),
+                ..._primaryLanguageOptions.map((o) => DropdownMenuItem(value: o, child: Text(o))),
+              ],
+              onChanged: (v) => setState(() => _primaryLanguage = v),
+            ),
+            if (_primaryLanguage == 'Other') ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _primaryLanguageOther,
+                decoration: const InputDecoration(labelText: 'Other language (please specify)'),
+              ),
+            ],
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _communicationType,
+              decoration: const InputDecoration(labelText: 'Communication type'),
+              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._communicationTypeOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              onChanged: (v) => setState(() => _communicationType = v),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _therapyStatus,
+              decoration: const InputDecoration(labelText: 'Therapy status'),
+              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._therapyStatusOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              onChanged: (v) => setState(() => _therapyStatus = v),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _referredBy,
               decoration: const InputDecoration(labelText: 'Referred by (optional)', hintText: 'e.g. Dr. Smith'),
@@ -289,19 +452,34 @@ class _AddChildSheetState extends State<_AddChildSheet> {
             TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notes'), maxLines: 2),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () {
-                if (_fn.text.trim().isEmpty || _ln.text.trim().isEmpty) return;
-                final dobStr = _dob != null ? '${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}' : null;
-                widget.onSubmit(
-                  _fn.text.trim(),
-                  _ln.text.trim(),
-                  dobStr,
-                  _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-                  _diagnosis.text.trim().isEmpty ? null : _diagnosis.text.trim(),
-                  _referredBy.text.trim().isEmpty ? null : _referredBy.text.trim(),
-                );
-              },
-              child: const Text('Save'),
+              onPressed: _saving
+                  ? null
+                  : () {
+                      if (_fn.text.trim().isEmpty || _ln.text.trim().isEmpty) return;
+                      setState(() => _saving = true);
+                      final dobStr = _dob != null ? '${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}' : null;
+                      widget.onSubmit(_AddChildData(
+                        firstName: _fn.text.trim(),
+                        lastName: _ln.text.trim(),
+                        dateOfBirth: dobStr,
+                        notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+                        diagnosis: _diagnosis.text.trim().isEmpty ? null : _diagnosis.text.trim(),
+                        referredBy: _referredBy.text.trim().isEmpty ? null : _referredBy.text.trim(),
+                        gender: _gender,
+                        diagnosisType: _diagnosisType == 'Other'
+                            ? (_diagnosisTypeOther.text.trim().isEmpty ? null : _diagnosisTypeOther.text.trim())
+                            : _diagnosisType,
+                        autismLevel: _autismLevel,
+                        primaryLanguage: _primaryLanguage == 'Other'
+                            ? (_primaryLanguageOther.text.trim().isEmpty ? null : _primaryLanguageOther.text.trim())
+                            : _primaryLanguage,
+                        communicationType: _communicationType,
+                        therapyStatus: _therapyStatus,
+                      ));
+                    },
+              child: _saving
+                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save'),
             ),
           ],
         ),

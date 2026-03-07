@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+import 'sessions_bloc.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../admin/presentation/add_user_screen.dart';
 import '../../auth/domain/user_entity.dart';
 import '../domain/session_entity.dart';
 import '../../children/domain/child_entity.dart';
 import 'sessions_bloc.dart';
-
-String _formatDateTime(DateTime dt) {
-  return DateFormat('d MMM yyyy, h:mm a').format(dt);
-}
 
 class SessionFormScreen extends StatefulWidget {
   const SessionFormScreen({
@@ -51,6 +48,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   final Map<String, TextEditingController> _metricControllers = {};
   String? _therapyTitle;
   UserEntity? _selectedTherapist;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -125,9 +123,20 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.session != null;
-    return Scaffold(
-      appBar: AppBar(title: Text(isEdit ? 'Edit session' : 'Log session')),
-      body: Form(
+    return BlocListener<SessionsBloc, SessionsState>(
+      listenWhen: (prev, curr) => _saving && prev.isLoading && !curr.isLoading,
+      listener: (context, state) {
+        if (state.error != null) {
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.error!)));
+        } else {
+          widget.onSaved();
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text(isEdit ? 'Edit session' : 'Log session')),
+        body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -142,10 +151,10 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 8),
-              Text('Created: ${_formatDateTime(widget.session!.createdAt)}', style: Theme.of(context).textTheme.bodySmall),
+              Text('Created: ${formatAppDateTime(widget.session!.createdAt)}', style: Theme.of(context).textTheme.bodySmall),
               if (widget.session!.updatedByUser != null || widget.session!.updatedAt.isAfter(widget.session!.createdAt)) ...[
                 const SizedBox(height: 4),
-                Text('Updated: ${_formatDateTime(widget.session!.updatedAt)}', style: Theme.of(context).textTheme.bodySmall),
+                Text('Updated: ${formatAppDateTime(widget.session!.updatedAt)}', style: Theme.of(context).textTheme.bodySmall),
                 if (widget.session!.updatedByUser != null)
                   Text('Updated by: ${widget.session!.updatedByUser!.fullName}', style: Theme.of(context).textTheme.bodySmall),
               ],
@@ -228,11 +237,14 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => _submit(context),
-              child: const Text('Save'),
+              onPressed: _saving ? null : () => _submit(context),
+              child: _saving
+                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save'),
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -340,6 +352,8 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   }
 
   void _submit(BuildContext context) {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _saving = true);
     final structuredMetrics = <String, dynamic>{};
     if (_therapyTitle != null) structuredMetrics['therapyTitle'] = _therapyTitle;
     final timeSlot = _timeSlotController.text.trim();
@@ -372,7 +386,5 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
             structuredMetrics: structuredMetrics.isEmpty ? null : structuredMetrics,
           ));
     }
-    widget.onSaved();
-    Navigator.of(context).pop();
   }
 }

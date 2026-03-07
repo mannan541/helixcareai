@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../children/domain/child_entity.dart';
 import '../data/analytics_repository.dart';
 
@@ -10,9 +10,9 @@ String _formatSessionDate(String sessionDate) {
     final dt = DateTime.parse(sessionDate);
     final hasTime = sessionDate.contains('T') || sessionDate.contains(' ');
     if (hasTime && (dt.hour != 0 || dt.minute != 0)) {
-      return DateFormat('MMMM d, yyyy h.mma').format(dt);
+      return formatAppDateTime(dt);
     }
-    return DateFormat('MMMM d, yyyy').format(dt);
+    return formatAppDate(dt);
   } catch (_) {
     return sessionDate;
   }

@@ -1,5 +1,6 @@
 import { query, queryOne } from '../../config/database';
 import * as childrenService from '../children/children.service';
+import * as therapyEmbeddingStorage from '../ai/therapyEmbeddingStorage';
 
 const SESSION_NOT_DELETED = ' AND s.deleted_at IS NULL';
 
@@ -44,7 +45,11 @@ export async function create(
       JSON.stringify(data.structuredMetrics ?? {}),
     ]
   );
-  return rows[0];
+  const session = rows[0];
+  therapyEmbeddingStorage.storeSessionNotes(session.id, session.child_id, session.notes_text ?? '').catch((err) =>
+    console.error('[sessions] therapy_embeddings sync failed:', err)
+  );
+  return session;
 }
 
 const SESSION_COLS = 's.id, s.child_id, s.created_by, s.therapist_id, s.session_date, s.duration_minutes, s.notes_text, s.structured_metrics, s.created_at, s.updated_at, s.updated_by, s.deleted_by, s.deleted_at';
@@ -198,7 +203,13 @@ export async function update(
     `UPDATE sessions SET ${updates.join(', ')} WHERE id = $${i} AND deleted_at IS NULL RETURNING *`,
     values
   );
-  return rows[0] ?? null;
+  const updated = rows[0] ?? null;
+  if (updated) {
+    therapyEmbeddingStorage.storeSessionNotes(updated.id, updated.child_id, updated.notes_text ?? '').catch((err) =>
+      console.error('[sessions] therapy_embeddings sync failed:', err)
+    );
+  }
+  return updated;
 }
 
 export async function remove(id: string, deletedByUserId: string): Promise<boolean> {
@@ -220,6 +231,26 @@ export async function canAccessSession(
   const child = await childrenService.findById(session.child_id);
   if (!child) return false;
   return childrenService.canAccessChild(child.user_id, userId, role);
+}
+
+/** Count of sessions where this user is the assigned therapist (for therapist dashboard). */
+export async function countByTherapistId(therapistId: string): Promise<number> {
+  const rows = await query<{ count: string }>(
+    'SELECT COUNT(*)::text AS count FROM sessions WHERE therapist_id = $1 AND deleted_at IS NULL',
+    [therapistId]
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
+}
+
+/** Count of sessions for children owned by this parent (for parent dashboard). */
+export async function countForParentUserId(parentUserId: string): Promise<number> {
+  const rows = await query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM sessions s
+     INNER JOIN children c ON s.child_id = c.id
+     WHERE c.user_id = $1 AND c.deleted_at IS NULL AND s.deleted_at IS NULL`,
+    [parentUserId]
+  );
+  return parseInt(rows[0]?.count ?? '0', 10);
 }
 
 // ---------- Session comments ----------

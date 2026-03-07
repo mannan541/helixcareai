@@ -12,10 +12,14 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
+  final _currentPasswordController = TextEditingController();
   final _passwordController = TextEditingController();
   UserEntity? _user;
   String? _error;
   bool _loading = true;
+  bool _saving = false;
+  bool _obscureCurrentPassword = true;
+  bool _obscureNewPassword = true;
 
   @override
   void initState() {
@@ -42,6 +46,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _currentPasswordController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -82,18 +87,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: 16),
+            if (!user.isAdmin) ...[
+              TextFormField(
+                controller: _currentPasswordController,
+                decoration: InputDecoration(
+                  labelText: 'Current password',
+                  hintText: 'Required when changing password',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureCurrentPassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(() => _obscureCurrentPassword = !_obscureCurrentPassword),
+                  ),
+                ),
+                obscureText: _obscureCurrentPassword,
+                validator: (v) {
+                  final newPass = _passwordController.text.trim();
+                  if (newPass.isNotEmpty && (v == null || v.isEmpty)) return 'Required to set new password';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
             TextFormField(
               controller: _passwordController,
-              decoration: const InputDecoration(
-                labelText: 'New password (optional)',
+              decoration: InputDecoration(
+                labelText: user.isAdmin ? 'New password (optional)' : 'New password (optional)',
                 hintText: 'Leave blank to keep current',
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureNewPassword ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                ),
               ),
-              obscureText: true,
+              obscureText: _obscureNewPassword,
+              onChanged: (_) => _formKey.currentState?.validate(),
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => _save(context),
-              child: const Text('Save'),
+              onPressed: _saving ? null : () => _save(context),
+              child: _saving
+                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save'),
             ),
           ],
         ),
@@ -103,10 +135,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _save(BuildContext context) async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _saving = true);
     final fullName = _fullNameController.text.trim();
-    final password = _passwordController.text.trim().isEmpty ? null : _passwordController.text;
+    final password = _passwordController.text.trim().isEmpty ? null : _passwordController.text.trim();
+    final currentPassword = password != null && !_user!.isAdmin
+        ? (_currentPasswordController.text.isEmpty ? null : _currentPasswordController.text)
+        : null;
     try {
-      final updated = await authRepository.updateProfile(fullName: fullName, password: password);
+      final updated = await authRepository.updateProfile(
+        fullName: fullName,
+        password: password,
+        currentPassword: currentPassword,
+      );
       if (!context.mounted) return;
       if (updated != null) {
         Navigator.of(context).pop(updated);
@@ -116,6 +156,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(e.toString())));
       }
+    } finally {
+      if (context.mounted) setState(() => _saving = false);
     }
   }
 }

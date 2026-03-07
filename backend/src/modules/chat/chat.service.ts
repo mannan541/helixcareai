@@ -1,6 +1,6 @@
 import { query } from '../../config/database';
 import * as childrenService from '../children/children.service';
-import * as aiService from '../ai/ai.service';
+import * as ragService from '../ai/ragService';
 
 export type ChatLogRow = {
   id: string;
@@ -47,10 +47,7 @@ export async function ask(
     throw Object.assign(new Error('Access denied'), { statusCode: 403 });
   }
   await addLog(userId, childId, 'user', question);
-  const embedding = await aiService.embedText(question);
-  const similar = await aiService.getSimilarEmbeddings(childId, embedding, 5);
-  const contextParts = similar.map((s) => s.content);
-  const answer = await aiService.generateRagResponse(contextParts, question);
+  const answer = await ragService.askChildAssistant(childId, question, { topK: 5 });
   await addLog(userId, childId, 'assistant', answer);
   return { answer };
 }

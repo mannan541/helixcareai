@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import '../../auth/domain/user_entity.dart';
 import '../../children/domain/child_entity.dart';
 
@@ -182,7 +183,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                 ..._children.map((c) => CheckboxListTile(
                       value: _selectedChildIds.contains(c.id),
                       title: Text(c.fullName),
-                      subtitle: c.dateOfBirth != null ? Text('DOB: ${c.dateOfBirth}') : null,
+                      subtitle: c.dateOfBirth != null ? Text('DOB: ${formatAppDateFromString(c.dateOfBirth) ?? c.dateOfBirth}') : null,
                       onChanged: (v) => setState(() {
                         if (v == true) {
                           _selectedChildIds.add(c.id);

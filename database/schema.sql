@@ -105,6 +105,20 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_session_id ON embeddings(session_id);
 -- Cosine distance for similarity search (<=> operator)
 CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
+-- ============== THERAPY EMBEDDINGS (local RAG: sentence-transformers all-MiniLM-L6-v2, 384 dims) ==============
+CREATE TABLE IF NOT EXISTS therapy_embeddings (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id   UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+  note_text  TEXT NOT NULL,
+  embedding  VECTOR(384) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_therapy_embeddings_child_id ON therapy_embeddings(child_id);
+CREATE INDEX IF NOT EXISTS idx_therapy_embeddings_session_id ON therapy_embeddings(session_id);
+-- L2 distance for similarity search (<-> operator)
+CREATE INDEX IF NOT EXISTS idx_therapy_embeddings_vector ON therapy_embeddings USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+
 -- ============== SESSION COMMENTS (e.g. parents add comments on sessions) ==============
 CREATE TABLE IF NOT EXISTS session_comments (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -312,4 +326,144 @@ CREATE TRIGGER children_updated_at BEFORE UPDATE ON children
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 DROP TRIGGER IF EXISTS sessions_updated_at ON sessions;
 CREATE TRIGGER sessions_updated_at BEFORE UPDATE ON sessions
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- ============== PRODUCTION CHILD & CLINICAL SCHEMA ==============
+-- Core identity & clinical profile (children)
+DO $$ BEGIN ALTER TABLE children ADD COLUMN child_code VARCHAR(50) UNIQUE; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN gender VARCHAR(20); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN profile_photo TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN diagnosis_type VARCHAR(100); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN autism_level VARCHAR(20); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN diagnosis_date DATE; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN primary_language VARCHAR(50); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN communication_type VARCHAR(50); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- Clinical information
+DO $$ BEGIN ALTER TABLE children ADD COLUMN iq_level VARCHAR(50); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN developmental_age VARCHAR(50); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN sensory_sensitivity TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN behavioral_notes TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN medical_conditions TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN medications TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN allergies TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- Therapy information
+DO $$ BEGIN ALTER TABLE children ADD COLUMN therapy_start_date DATE; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN therapy_status VARCHAR(20); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN assigned_therapist_id UUID REFERENCES users(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN therapy_center_id UUID; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN therapy_plan_id UUID; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN sessions_per_week INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- Learning & skill profile (current/latest scores)
+DO $$ BEGIN ALTER TABLE children ADD COLUMN communication_score INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN social_score INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN behavioral_score INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN cognitive_score INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN motor_skill_score INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- AI & analytics
+DO $$ BEGIN ALTER TABLE children ADD COLUMN rag_profile_summary TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN last_ai_analysis_date TIMESTAMPTZ; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE children ADD COLUMN embedding_vector_id VARCHAR(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- Status
+DO $$ BEGIN ALTER TABLE children ADD COLUMN status VARCHAR(20) DEFAULT 'active'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+CREATE INDEX IF NOT EXISTS idx_children_child_code ON children(child_code);
+CREATE INDEX IF NOT EXISTS idx_children_assigned_therapist ON children(assigned_therapist_id);
+CREATE INDEX IF NOT EXISTS idx_children_therapy_status ON children(therapy_status);
+CREATE INDEX IF NOT EXISTS idx_children_status ON children(status);
+
+-- ============== GUARDIANS ==============
+CREATE TABLE IF NOT EXISTS guardians (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  full_name    VARCHAR(255) NOT NULL,
+  phone        VARCHAR(50),
+  email        VARCHAR(255),
+  relationship VARCHAR(50),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at   TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_guardians_email ON guardians(email);
+
+-- ============== CHILD_GUARDIANS (junction: child <-> guardians) ==============
+CREATE TABLE IF NOT EXISTS child_guardians (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id    UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  guardian_id UUID NOT NULL REFERENCES guardians(id) ON DELETE CASCADE,
+  is_primary  BOOLEAN DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(child_id, guardian_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_child_guardians_child ON child_guardians(child_id);
+CREATE INDEX IF NOT EXISTS idx_child_guardians_guardian ON child_guardians(guardian_id);
+
+-- ============== THERAPY CENTERS & PLANS (lookup for children) ==============
+CREATE TABLE IF NOT EXISTS therapy_centers (
+  id   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS therapy_plans (
+  id   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Seed default options (idempotent: use fixed UUIDs so re-run doesn't duplicate)
+INSERT INTO therapy_centers (id, name) VALUES
+  ('a0000001-0001-4000-8000-000000000001', 'Main Center'),
+  ('a0000001-0001-4000-8000-000000000002', 'North Branch'),
+  ('a0000001-0001-4000-8000-000000000003', 'South Branch')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO therapy_plans (id, name) VALUES
+  ('b0000001-0001-4000-8000-000000000001', 'Standard Plan'),
+  ('b0000001-0001-4000-8000-000000000002', 'Intensive Plan'),
+  ('b0000001-0001-4000-8000-000000000003', 'Early Intervention')
+ON CONFLICT (id) DO NOTHING;
+
+-- ============== CHILD THERAPISTS (multiple therapists per child) ==============
+CREATE TABLE IF NOT EXISTS child_therapists (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id    UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  therapist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(child_id, therapist_id)
+);
+CREATE INDEX IF NOT EXISTS idx_child_therapists_child ON child_therapists(child_id);
+CREATE INDEX IF NOT EXISTS idx_child_therapists_therapist ON child_therapists(therapist_id);
+
+-- ============== SESSION FIELDS FOR RAG (therapy session notes) ==============
+DO $$ BEGIN ALTER TABLE sessions ADD COLUMN goals_worked_on TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE sessions ADD COLUMN activities_performed TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE sessions ADD COLUMN child_response TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE sessions ADD COLUMN improvements TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE sessions ADD COLUMN behavioral_issues TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE sessions ADD COLUMN mood_rating INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE sessions ADD COLUMN engagement_score INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- ============== CHILD PROGRESS LOGS (skill scores over time for analytics) ==============
+CREATE TABLE IF NOT EXISTS child_progress_logs (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id             UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  logged_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  communication_score  INTEGER,
+  social_score         INTEGER,
+  behavioral_score    INTEGER,
+  cognitive_score     INTEGER,
+  motor_skill_score   INTEGER,
+  notes               TEXT,
+  created_by          UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at          TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_child_progress_logs_child ON child_progress_logs(child_id);
+CREATE INDEX IF NOT EXISTS idx_child_progress_logs_logged_at ON child_progress_logs(logged_at);
+
+DROP TRIGGER IF EXISTS guardians_updated_at ON guardians;
+CREATE TRIGGER guardians_updated_at BEFORE UPDATE ON guardians
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS child_progress_logs_updated_at ON child_progress_logs;
+CREATE TRIGGER child_progress_logs_updated_at BEFORE UPDATE ON child_progress_logs
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();

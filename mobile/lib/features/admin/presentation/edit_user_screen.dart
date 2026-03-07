@@ -35,6 +35,7 @@ class _EditUserScreenState extends State<EditUserScreen> {
   String _adminTitle = _adminTitleOptions.first;
   bool _loading = false;
   bool _initialLoad = true;
+  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -180,11 +181,15 @@ class _EditUserScreenState extends State<EditUserScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'New password (leave blank to keep current)',
                       hintText: 'Min 8 characters',
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
                     ),
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     validator: (v) {
                       if (v != null && v.isNotEmpty && v.length < 8) return 'Min 8 characters';
                       return null;

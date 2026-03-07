@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import '../domain/child_entity.dart';
 import 'children_bloc.dart';
 import 'edit_child_screen.dart';
@@ -46,31 +47,34 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_child.dateOfBirth != null || _child.diagnosis != null || _child.referredBy != null) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_child.dateOfBirth != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text('DOB: ${_child.dateOfBirth}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                      ),
-                    if (_child.diagnosis != null && _child.diagnosis!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text('Diagnosis: ${_child.diagnosis}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                      ),
-                    if (_child.referredBy != null && _child.referredBy!.isNotEmpty)
-                      Text('Referred by: ${_child.referredBy}', style: const TextStyle(fontWeight: FontWeight.w500)),
-                  ],
-                ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_child.childCode != null && _child.childCode!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('Child ID: ${_child.childCode}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  if (_child.dateOfBirth != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('DOB: ${formatAppDateFromString(_child.dateOfBirth) ?? _child.dateOfBirth}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    ),
+                  if (_child.diagnosis != null && _child.diagnosis!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('Diagnosis: ${_child.diagnosis}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    ),
+                  if (_child.referredBy != null && _child.referredBy!.isNotEmpty)
+                    Text('Referred by: ${_child.referredBy}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-          ],
+          ),
+          const SizedBox(height: 8),
           Card(
             child: ListTile(
               leading: const Icon(Icons.calendar_today),

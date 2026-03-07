@@ -44,10 +44,11 @@ class ChatRepository {
 
   Future<String> ask(String childId, String question) async {
     try {
-      final data = await _api.post<Map<String, dynamic>>('/api/chat/ask', {
-        'childId': childId,
-        'question': question,
-      });
+      final data = await _api.post<Map<String, dynamic>>(
+        '/api/chat/ask',
+        {'childId': childId, 'question': question},
+        const Duration(seconds: 180),
+      );
       return data!['answer'] as String;
     } on DioException catch (e) {
       throw _handle(e);

@@ -8,6 +8,8 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', childrenController.list);
+router.get('/therapy-centers', childrenController.listTherapyCenters);
+router.get('/therapy-plans', childrenController.listTherapyPlans);
 
 router.get(
   '/:id',
@@ -24,6 +26,24 @@ router.post(
     body('notes').optional().isString(),
     body('diagnosis').optional().isString(),
     body('referredBy').optional().isString(),
+    body('childCode').optional().isString(),
+    body('gender').optional().isString(),
+    body('profilePhoto').optional().isString(),
+    body('diagnosisType').optional().isString(),
+    body('autismLevel').optional().isString(),
+    body('diagnosisDate').optional().isString(),
+    body('primaryLanguage').optional().isString(),
+    body('communicationType').optional().isString(),
+    body('therapyStartDate').optional().isString(),
+    body('therapyStatus').optional().isString(),
+    body('assignedTherapistId').optional().isUUID(),
+    body('sessionsPerWeek').optional().isInt({ min: 0, max: 14 }),
+    body('communicationScore').optional().isInt({ min: 0, max: 10 }),
+    body('socialScore').optional().isInt({ min: 0, max: 10 }),
+    body('behavioralScore').optional().isInt({ min: 0, max: 10 }),
+    body('cognitiveScore').optional().isInt({ min: 0, max: 10 }),
+    body('motorSkillScore').optional().isInt({ min: 0, max: 10 }),
+    body('status').optional().isString(),
   ]),
   childrenController.create
 );
@@ -38,6 +58,27 @@ router.patch(
     body('notes').optional().isString(),
     body('diagnosis').optional().isString(),
     body('referredBy').optional().isString(),
+    body('childCode').optional().isString(),
+    body('gender').optional().isString(),
+    body('profilePhoto').optional().isString(),
+    body('diagnosisType').optional().isString(),
+    body('autismLevel').optional().isString(),
+    body('diagnosisDate').optional().isString(),
+    body('primaryLanguage').optional().isString(),
+    body('communicationType').optional().isString(),
+    body('therapyStartDate').optional().isString(),
+    body('therapyStatus').optional().isString(),
+    body('assignedTherapistId').optional().isUUID(),
+    body('assignedTherapistIds').optional().isArray(),
+    body('therapyCenterId').optional().isUUID(),
+    body('therapyPlanId').optional().isUUID(),
+    body('sessionsPerWeek').optional().isInt({ min: 0, max: 14 }),
+    body('communicationScore').optional().isInt({ min: 0, max: 10 }),
+    body('socialScore').optional().isInt({ min: 0, max: 10 }),
+    body('behavioralScore').optional().isInt({ min: 0, max: 10 }),
+    body('cognitiveScore').optional().isInt({ min: 0, max: 10 }),
+    body('motorSkillScore').optional().isInt({ min: 0, max: 10 }),
+    body('status').optional().isString(),
   ]),
   childrenController.update
 );

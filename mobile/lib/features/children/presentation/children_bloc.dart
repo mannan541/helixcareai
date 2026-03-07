@@ -22,19 +22,28 @@ class ChildrenBloc extends Bloc<ChildrenEvent, ChildrenState> {
     if (e.loadMore) {
       final current = state;
       if (current.isLoadingMore || !current.hasMore || current.children.isEmpty) return;
-      emit(ChildrenState.loadingMore(current.children, total: current.total));
+      emit(ChildrenState.loadingMore(current.children, total: current.total, search: current.search));
       try {
-        final res = await _repo.list(limit: _pageSize, offset: current.children.length);
-        emit(ChildrenState.loaded([...current.children, ...res.children], total: res.total));
+        final res = await _repo.list(
+          limit: _pageSize,
+          offset: current.children.length,
+          search: current.search,
+        );
+        emit(ChildrenState.loaded(
+          [...current.children, ...res.children],
+          total: res.total,
+          search: current.search,
+        ));
       } catch (err) {
         emit(ChildrenState.failure(err is Exception ? err.toString() : 'Failed to load more'));
       }
       return;
     }
+    final search = e.search?.trim().isEmpty ?? true ? null : e.search?.trim();
     emit(const ChildrenState.loading());
     try {
-      final res = await _repo.list(limit: _pageSize, offset: 0);
-      emit(ChildrenState.loaded(res.children, total: res.total));
+      final res = await _repo.list(limit: _pageSize, offset: 0, search: search);
+      emit(ChildrenState.loaded(res.children, total: res.total, search: search));
     } catch (err) {
       emit(ChildrenState.failure(err is Exception ? err.toString() : 'Failed to load'));
     }
@@ -53,6 +62,33 @@ class ChildrenBloc extends Bloc<ChildrenEvent, ChildrenState> {
         notes: e.notes,
         diagnosis: e.diagnosis,
         referredBy: e.referredBy,
+        childCode: e.childCode,
+        gender: e.gender,
+        profilePhoto: e.profilePhoto,
+        diagnosisType: e.diagnosisType,
+        autismLevel: e.autismLevel,
+        diagnosisDate: e.diagnosisDate,
+        primaryLanguage: e.primaryLanguage,
+        communicationType: e.communicationType,
+        iqLevel: e.iqLevel,
+        developmentalAge: e.developmentalAge,
+        sensorySensitivity: e.sensorySensitivity,
+        behavioralNotes: e.behavioralNotes,
+        medicalConditions: e.medicalConditions,
+        medications: e.medications,
+        allergies: e.allergies,
+        therapyStartDate: e.therapyStartDate,
+        therapyStatus: e.therapyStatus,
+        assignedTherapistId: e.assignedTherapistId,
+        therapyCenterId: e.therapyCenterId,
+        therapyPlanId: e.therapyPlanId,
+        sessionsPerWeek: e.sessionsPerWeek,
+        communicationScore: e.communicationScore,
+        socialScore: e.socialScore,
+        behavioralScore: e.behavioralScore,
+        cognitiveScore: e.cognitiveScore,
+        motorSkillScore: e.motorSkillScore,
+        status: e.status,
       );
       emit(ChildrenState.loaded([...previousList, child], total: current.total + 1));
     } catch (err) {
@@ -67,8 +103,40 @@ class ChildrenBloc extends Bloc<ChildrenEvent, ChildrenState> {
     emit(ChildrenState.loading());
     try {
       final updated = await _repo.update(e.id,
-          firstName: e.firstName, lastName: e.lastName, dateOfBirth: e.dateOfBirth, notes: e.notes,
-          diagnosis: e.diagnosis, referredBy: e.referredBy);
+          firstName: e.firstName,
+          lastName: e.lastName,
+          dateOfBirth: e.dateOfBirth,
+          notes: e.notes,
+          diagnosis: e.diagnosis,
+          referredBy: e.referredBy,
+          childCode: e.childCode,
+          gender: e.gender,
+          profilePhoto: e.profilePhoto,
+          diagnosisType: e.diagnosisType,
+          autismLevel: e.autismLevel,
+          diagnosisDate: e.diagnosisDate,
+          primaryLanguage: e.primaryLanguage,
+          communicationType: e.communicationType,
+          iqLevel: e.iqLevel,
+          developmentalAge: e.developmentalAge,
+          sensorySensitivity: e.sensorySensitivity,
+          behavioralNotes: e.behavioralNotes,
+          medicalConditions: e.medicalConditions,
+          medications: e.medications,
+          allergies: e.allergies,
+          therapyStartDate: e.therapyStartDate,
+          therapyStatus: e.therapyStatus,
+          assignedTherapistId: e.assignedTherapistId,
+          assignedTherapistIds: e.assignedTherapistIds,
+          therapyCenterId: e.therapyCenterId,
+          therapyPlanId: e.therapyPlanId,
+          sessionsPerWeek: e.sessionsPerWeek,
+          communicationScore: e.communicationScore,
+          socialScore: e.socialScore,
+          behavioralScore: e.behavioralScore,
+          cognitiveScore: e.cognitiveScore,
+          motorSkillScore: e.motorSkillScore,
+          status: e.status);
       final list = previousList.map((c) => c.id == updated.id ? updated : c).toList();
       emit(ChildrenState.loaded(list, total: current.total));
     } catch (err) {

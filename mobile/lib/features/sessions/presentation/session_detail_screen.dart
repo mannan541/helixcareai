@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/date_format.dart';
 import '../domain/session_entity.dart';
 import '../data/sessions_repository.dart';
 import '../../children/domain/child_entity.dart';
 import 'sessions_bloc.dart';
 import 'session_form_screen.dart';
-
-String _formatDateTime(DateTime dt) {
-  return DateFormat('d MMM yyyy, h:mm a').format(dt);
-}
 
 class SessionDetailScreen extends StatefulWidget {
   const SessionDetailScreen({
@@ -37,6 +33,7 @@ class SessionDetailScreen extends StatefulWidget {
 class _SessionDetailScreenState extends State<SessionDetailScreen> {
   List<SessionCommentEntity> _comments = [];
   bool _loadingComments = true;
+  bool _postingComment = false;
   final _commentController = TextEditingController();
 
   @override
@@ -67,6 +64,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   Future<void> _addComment() async {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
+    setState(() => _postingComment = true);
     try {
       await sessionsRepository.addComment(widget.session.id, text);
       _commentController.clear();
@@ -77,6 +75,8 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           SnackBar(content: SelectableText(e is Exception ? e.toString() : 'Failed to add comment')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _postingComment = false);
     }
   }
 
@@ -127,15 +127,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
-          Text('Created: ${_formatDateTime(s.createdAt)}', style: Theme.of(context).textTheme.bodySmall),
+          Text('Created: ${formatAppDateTime(s.createdAt)}', style: Theme.of(context).textTheme.bodySmall),
           if (s.updatedByUser != null || s.updatedAt.isAfter(s.createdAt)) ...[
             const SizedBox(height: 4),
-            Text('Updated: ${_formatDateTime(s.updatedAt)}', style: Theme.of(context).textTheme.bodySmall),
+            Text('Updated: ${formatAppDateTime(s.updatedAt)}', style: Theme.of(context).textTheme.bodySmall),
             if (s.updatedByUser != null)
               Text('Updated by: ${s.updatedByUser!.fullName}', style: Theme.of(context).textTheme.bodySmall),
           ],
           const SizedBox(height: 16),
-          Text('Session date: ${DateFormat.yMMMd().format(s.sessionDate)}', style: Theme.of(context).textTheme.bodyMedium),
+          Text('Session date: ${formatAppDate(s.sessionDate)}', style: Theme.of(context).textTheme.bodyMedium),
           if (s.durationMinutes != null) Text('Duration: ${s.durationMinutes} min', style: Theme.of(context).textTheme.bodyMedium),
           if (s.notesText != null && s.notesText!.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -172,7 +172,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         const SizedBox(height: 4),
                         Text(c.comment),
                         const SizedBox(height: 4),
-                        Text(DateFormat('d MMM yyyy, h:mm a').format(c.createdAt), style: Theme.of(context).textTheme.bodySmall),
+                        Text(formatAppDateTime(c.createdAt), style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -193,8 +193,10 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: _addComment,
-                  child: const Text('Post'),
+                  onPressed: _postingComment ? null : _addComment,
+                  child: _postingComment
+                      ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Post'),
                 ),
               ],
             ),

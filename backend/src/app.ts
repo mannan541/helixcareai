@@ -14,6 +14,7 @@ import childrenRoutes from './modules/children/children.routes';
 import sessionsRoutes from './modules/sessions/sessions.routes';
 import chatRoutes from './modules/chat/chat.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
+import aiRoutes from './modules/ai/aiRoutes';
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/children', childrenRoutes);
 app.use('/api/sessions', sessionsRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
 app.get('/api-docs/spec', (req, res) => res.json(specWithServer(req)));

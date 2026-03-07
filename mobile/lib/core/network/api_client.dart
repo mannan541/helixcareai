@@ -11,7 +11,7 @@ class ApiClient {
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 120),
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
     ));
     _dio.interceptors.add(InterceptorsWrapper(
@@ -66,8 +66,9 @@ class ApiClient {
     return _ensureJson<T>(r.data, r.statusCode);
   }
 
-  Future<T> post<T>(String path, [dynamic data]) async {
-    final r = await _dio.post<dynamic>(path, data: data);
+  Future<T> post<T>(String path, [dynamic data, Duration? receiveTimeout]) async {
+    final options = receiveTimeout != null ? Options(receiveTimeout: receiveTimeout) : null;
+    final r = await _dio.post<dynamic>(path, data: data, options: options);
     return _ensureJson<T>(r.data, r.statusCode);
   }
 

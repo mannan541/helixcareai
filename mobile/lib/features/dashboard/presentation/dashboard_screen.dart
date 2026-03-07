@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection.dart';
 import '../../auth/domain/user_entity.dart';
 import '../../auth/data/auth_repository.dart';
-import '../../children/data/children_repository.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.initialUser});
@@ -18,6 +17,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   UserEntity? _user;
   DashboardCounts? _counts;
   int? _childrenCount; // for therapist/parent
+  int? _sessionsCount; // for therapist: my sessions; for parent: children's sessions
   bool _loading = true;
   String? _error;
 
@@ -50,17 +50,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       DashboardCounts? counts;
       int? childrenCount;
+      int? sessionsCount;
       if (user.isAdmin) {
         counts = await authRepository.getDashboardCounts();
       } else {
-        final resp = await childrenRepository.list(limit: 1, offset: 0);
-        childrenCount = resp.total;
+        final userCounts = await authRepository.getDashboardCountsForUser();
+        childrenCount = userCounts?.children;
+        sessionsCount = userCounts?.sessions;
       }
       if (!mounted) return;
       setState(() {
         _user = user;
         _counts = counts;
         _childrenCount = childrenCount;
+        _sessionsCount = sessionsCount;
         _loading = false;
       });
     } catch (e) {
@@ -229,7 +232,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTherapistCards() {
-    final count = _childrenCount ?? 0;
+    final childrenCount = _childrenCount ?? 0;
+    final sessionsCount = _sessionsCount ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -240,14 +244,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(child: _DashboardCard(
               title: 'Children',
-              count: count,
+              count: childrenCount,
               icon: Icons.child_care,
               onTap: () => _navigateTo(context, '/children'),
             )),
             const SizedBox(width: 12),
             Expanded(child: _DashboardCard(
               title: 'Log session',
-              count: null,
+              count: sessionsCount,
               icon: Icons.event_note,
               onTap: () {
                 _navigateTo(context, '/children');
@@ -265,18 +269,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildParentCards() {
-    final count = _childrenCount ?? 0;
+    final childrenCount = _childrenCount ?? 0;
+    final sessionsCount = _sessionsCount ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 8),
         Text('My children', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
-        _DashboardCard(
-          title: 'My Children',
-          count: count,
-          icon: Icons.child_care,
-          onTap: () => _navigateTo(context, '/children'),
+        Row(
+          children: [
+            Expanded(child: _DashboardCard(
+              title: 'My Children',
+              count: childrenCount,
+              icon: Icons.child_care,
+              onTap: () => _navigateTo(context, '/children'),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _DashboardCard(
+              title: 'Sessions',
+              count: sessionsCount,
+              icon: Icons.event_note,
+              onTap: () => _navigateTo(context, '/children'),
+            )),
+          ],
         ),
       ],
     );
