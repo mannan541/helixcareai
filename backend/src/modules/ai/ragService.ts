@@ -11,42 +11,42 @@ const DEFAULT_TOP_K = 5;
  * the child's details, diagnosis, status, therapies, etc.
  */
 function formatChildProfileForAI(c: ChildRow): string {
-  const line = (label: string, value: unknown) =>
+  const line = (label: string, value: string | null | undefined | unknown): string | null =>
     value != null && String(value).trim() !== '' ? `${label}: ${value}` : null;
-  const lines: string[] = [];
+  const lines: (string | null)[] = [];
   const firstName = (c.first_name ?? '').trim();
   const lastName = (c.last_name ?? '').trim();
   const fullName = [firstName, lastName].filter(Boolean).join(' ') || '—';
   lines.push(line('Full name', fullName));
-  lines.push(line('Child code', c.child_code));
-  lines.push(line('Joining date', c.created_at));
-  lines.push(line('Current status', c.status));
-  lines.push(line('Date of birth', c.date_of_birth));
-  lines.push(line('Gender', c.gender));
-  lines.push(line('Diagnosis', c.diagnosis));
-  lines.push(line('Diagnosis type', c.diagnosis_type));
-  lines.push(line('Autism level', c.autism_level));
-  lines.push(line('Diagnosis date', c.diagnosis_date));
-  lines.push(line('Referred by', c.referred_by));
-  lines.push(line('Primary language', c.primary_language));
-  lines.push(line('Communication type', c.communication_type));
-  lines.push(line('IQ level', c.iq_level));
-  lines.push(line('Developmental age', c.developmental_age));
-  lines.push(line('Sensory sensitivity', c.sensory_sensitivity));
-  lines.push(line('Behavioral notes', c.behavioral_notes));
-  lines.push(line('Medical conditions', c.medical_conditions));
-  lines.push(line('Medications', c.medications));
-  lines.push(line('Allergies', c.allergies));
-  lines.push(line('Therapy start date', c.therapy_start_date));
-  lines.push(line('Therapy status', c.therapy_status));
-  lines.push(line('Sessions per week', c.sessions_per_week));
-  lines.push(line('Communication score', c.communication_score));
-  lines.push(line('Social score', c.social_score));
-  lines.push(line('Behavioral score', c.behavioral_score));
-  lines.push(line('Cognitive score', c.cognitive_score));
-  lines.push(line('Motor skill score', c.motor_skill_score));
-  lines.push(line('General notes', c.notes));
-  return lines.filter(Boolean).join('\n');
+  lines.push(line('Child code', c.child_code ?? null));
+  lines.push(line('Joining date', c.created_at ?? null));
+  lines.push(line('Current status', c.status ?? null));
+  lines.push(line('Date of birth', c.date_of_birth ?? null));
+  lines.push(line('Gender', c.gender ?? null));
+  lines.push(line('Diagnosis', c.diagnosis ?? null));
+  lines.push(line('Diagnosis type', c.diagnosis_type ?? null));
+  lines.push(line('Autism level', c.autism_level ?? null));
+  lines.push(line('Diagnosis date', c.diagnosis_date ?? null));
+  lines.push(line('Referred by', c.referred_by ?? null));
+  lines.push(line('Primary language', c.primary_language ?? null));
+  lines.push(line('Communication type', c.communication_type ?? null));
+  lines.push(line('IQ level', c.iq_level ?? null));
+  lines.push(line('Developmental age', c.developmental_age ?? null));
+  lines.push(line('Sensory sensitivity', c.sensory_sensitivity ?? null));
+  lines.push(line('Behavioral notes', c.behavioral_notes ?? null));
+  lines.push(line('Medical conditions', c.medical_conditions ?? null));
+  lines.push(line('Medications', c.medications ?? null));
+  lines.push(line('Allergies', c.allergies ?? null));
+  lines.push(line('Therapy start date', c.therapy_start_date ?? null));
+  lines.push(line('Therapy status', c.therapy_status ?? null));
+  lines.push(line('Sessions per week', c.sessions_per_week ?? null));
+  lines.push(line('Communication score', c.communication_score ?? null));
+  lines.push(line('Social score', c.social_score ?? null));
+  lines.push(line('Behavioral score', c.behavioral_score ?? null));
+  lines.push(line('Cognitive score', c.cognitive_score ?? null));
+  lines.push(line('Motor skill score', c.motor_skill_score ?? null));
+  lines.push(line('General notes', c.notes ?? null));
+  return lines.filter((x): x is string => x != null).join('\n');
 }
 
 /**

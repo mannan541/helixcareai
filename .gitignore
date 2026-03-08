@@ -32,3 +32,10 @@ npm-debug.log*
 # Flutter
 mobile/.flutter-plugins
 mobile/.flutter-plugins-dependencies
+
+# Python (embedding-service)
+embedding-service/venv/
+embedding-service/__pycache__/
+
+# Vercel (local project link)
+.vercel/
