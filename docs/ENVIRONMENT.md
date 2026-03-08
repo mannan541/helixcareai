@@ -42,6 +42,16 @@ Override with `backend/.env.development.local` for machine-specific or secret va
 | `GEMINI_API_KEY`  | Optional | RAG chat fallback when Groq fails/unset. Get key: https://aistudio.google.com/apikey |
 | `GEMINI_MODEL`    | Optional | e.g. `gemini-2.0-flash` (default) |
 
+**AI chat in production:** The app requires at least one of `GROQ_API_KEY` or `GEMINI_API_KEY` for the AI chat to work. Add it in the **backend** Vercel project:
+
+1. Open [Vercel Dashboard](https://vercel.com) → select your **backend** project (the API, e.g. helixacareai backend).
+2. Go to **Settings** → **Environment Variables**.
+3. Add one of:
+   - **GROQ:** Name `GROQ_API_KEY`, Value = your key from [console.groq.com](https://console.groq.com). Optionally `GROQ_MODEL` (e.g. `llama-3.1-8b-instant`).
+   - **Gemini:** Name `GEMINI_API_KEY`, Value = your key from [Google AI Studio](https://aistudio.google.com/apikey). Optionally `GEMINI_MODEL` (e.g. `gemini-2.0-flash`).
+4. Choose **Production** (and **Preview** if you use it), then **Save**.
+5. **Redeploy** the backend (Deployments → latest → ⋮ → Redeploy) so the new variable is applied.
+
 See `backend/.env.production.example` for a full checklist.
 
 ---
