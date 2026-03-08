@@ -1,0 +1,70 @@
+# Deploy Flutter web frontend to Vercel when code is pushed to main.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       - Vercel API token (Account → Settings → Tokens)
+#   VERCEL_ORG_ID      - Team/org ID (e.g. from mobile/.vercel/project.json orgId)
+#   VERCEL_PROJECT_ID  - Project ID for the frontend app (from mobile/.vercel/project.json projectId)
+
+name: Deploy Frontend (main)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-frontend:
+    name: Build and deploy Flutter web to Vercel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.x"
+          channel: "stable"
+          cache: true
+
+      - name: Use production env (API base URL)
+        working-directory: mobile
+        run: |
+          if [ ! -f .env.production ]; then
+            echo "::error::mobile/.env.production is required for production deploy (API_BASE_URL). See docs/ENVIRONMENT.md"
+            exit 1
+          fi
+          cp .env.production .env
+          echo "Using API_BASE_URL from .env.production: $(grep -v '^#' .env | grep API_BASE_URL || true)"
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build Flutter web
+        working-directory: mobile
+        run: flutter build web --release
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel env
+        working-directory: mobile
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Prepare Vercel output (static)
+        working-directory: mobile
+        run: |
+          mkdir -p .vercel/output/static
+          cp -r build/web/* .vercel/output/static/
+          echo '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
+
+      - name: Deploy to Vercel (production)
+        working-directory: mobile
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
