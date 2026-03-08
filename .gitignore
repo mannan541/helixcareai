@@ -13,6 +13,7 @@ mobile/.idea/
 # Environment and secrets (keep .env.example)
 .env
 backend/.env
+backend/.env.development.local
 mobile/.env
 !.env.example
 !backend/.env.example
@@ -39,3 +40,7 @@ embedding-service/__pycache__/
 
 # Vercel (local project link)
 .vercel/
+
+# Local artifacts (empty / symlinks)
+helixcareai-backend@1.0.0
+tsx

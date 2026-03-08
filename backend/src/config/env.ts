@@ -2,11 +2,14 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 
+// Base .env (all environments)
 dotenv.config();
+// Local overrides (never commit real secrets; .env.development.local is gitignored)
 const devLocal = path.resolve(process.cwd(), '.env.development.local');
 if (fs.existsSync(devLocal)) {
   dotenv.config({ path: devLocal, override: true });
 }
+// Production on Vercel: no .env file; all vars from Vercel Environment Variables (Production).
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV ?? 'development',

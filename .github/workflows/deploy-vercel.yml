@@ -74,12 +74,21 @@ jobs:
           channel: "stable"
           cache: true
 
-      - name: Set production env for build
+      - name: Set env for build (production on main, else fallback)
         working-directory: mobile
         run: |
-          # Ensure .env exists for asset bundle; use production API URL
-          cp .env.production .env 2>/dev/null || true
-          if [ ! -f .env ]; then echo 'API_BASE_URL=https://helixacareai.vercel.app' > .env; fi
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            if [ ! -f .env.production ]; then
+              echo "::error::mobile/.env.production required for production. See docs/ENVIRONMENT.md"
+              exit 1
+            fi
+            cp .env.production .env
+          else
+            cp .env.production .env 2>/dev/null || true
+            if [ ! -f .env ] || ! grep -q API_BASE_URL .env 2>/dev/null; then
+              echo 'API_BASE_URL=https://helixacareai.vercel.app' > .env
+            fi
+          fi
 
       - name: Install dependencies
         working-directory: mobile

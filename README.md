@@ -6,6 +6,8 @@ Production-ready monorepo for the HelixCareAI autism therapy management platform
 
 **📘 [Project overview & full concept document (NeuroNest)](docs/PROJECT_OVERVIEW_AND_CONCEPT.md)** — Executive summary, problem/solution, features, architecture, security, phases, and vision (HelixCareAI implementation).
 
+**🔧 [Environment: local vs production](docs/ENVIRONMENT.md)** — Backend and mobile env vars, local `.env` vs Vercel production, API base URLs.
+
 ## Stack
 
 | Layer | Technology |
