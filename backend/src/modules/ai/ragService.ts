@@ -78,9 +78,15 @@ export async function askChildAssistant(
   const child = await childrenService.findById(childId);
   const childProfile = child ? formatChildProfileForAI(child) : '';
 
-  const embedding = await embeddingService.generateEmbedding(trimmedQuestion);
-  const notes = await vectorSearchService.findRelevantNotes(childId, embedding, topK);
-  const context = notes.length > 0 ? notes.join('\n\n---\n\n') : '';
+  let context = '';
+  try {
+    const embedding = await embeddingService.generateEmbedding(trimmedQuestion);
+    const notes = await vectorSearchService.findRelevantNotes(childId, embedding, topK);
+    context = notes.length > 0 ? notes.join('\n\n---\n\n') : '';
+  } catch (_e) {
+    // Embedding service unreachable (e.g. on Vercel without Python service): answer from child profile only
+    context = '';
+  }
 
   const llmOptions = { childProfile: childProfile || undefined };
 
@@ -88,6 +94,16 @@ export async function askChildAssistant(
   const tryGroq = () => groqService.askLLM(trimmedQuestion, context, llmOptions);
   const tryGemini = () => geminiService.askLLM(trimmedQuestion, context, llmOptions);
   const tryOllama = () => ollamaService.askLLM(trimmedQuestion, context, llmOptions);
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hasCloudLLM = groqService.isConfigured() || geminiService.isConfigured();
+  if (isProduction && !hasCloudLLM) {
+    const err = new Error(
+      'AI chat requires GROQ_API_KEY or GEMINI_API_KEY in production. Add one in Vercel → Project → Settings → Environment Variables.'
+    ) as Error & { statusCode?: number };
+    err.statusCode = 503;
+    throw err;
+  }
 
   if (groqService.isConfigured()) {
     try {
