@@ -17,6 +17,7 @@ class SessionDetailScreen extends StatefulWidget {
     required this.canEdit,
     required this.canAddNotes,
     required this.onSaved,
+    this.canDeleteSession = false,
   });
 
   final ChildEntity child;
@@ -26,6 +27,8 @@ class SessionDetailScreen extends StatefulWidget {
   /// Whether the user can add notes (comments) on a session (parent, therapist, admin).
   final bool canAddNotes;
   final VoidCallback onSaved;
+  /// Only admin can delete the session.
+  final bool canDeleteSession;
 
   @override
   State<SessionDetailScreen> createState() => _SessionDetailScreenState();
@@ -129,6 +132,67 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
     }
   }
 
+  Future<void> _deleteComment(SessionCommentEntity c) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete note?'),
+        content: const Text('This note will be removed. You cannot undo this.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    try {
+      await sessionsRepository.deleteComment(widget.session.id, c.id);
+      if (mounted) _loadComments();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: SelectableText(e is Exception ? e.toString() : 'Failed to delete note')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteSession() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete session?'),
+        content: const Text('This session will be permanently deleted. You cannot undo this.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    try {
+      await sessionsRepository.deleteSession(widget.session.id);
+      if (!mounted) return;
+      widget.onSaved();
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session deleted')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: SelectableText(e is Exception ? e.toString() : 'Failed to delete session')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
@@ -136,6 +200,12 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
       appBar: AppBar(
         title: const Text('Session'),
         actions: [
+          if (widget.canDeleteSession)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete session',
+              onPressed: _deleteSession,
+            ),
           if (widget.canEdit)
             TextButton(
               onPressed: () async {
@@ -233,12 +303,18 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                                 ],
                               ),
                             ),
-                          if (canEditComment)
+                          if (canEditComment) ...[
                             IconButton(
                               icon: const Icon(Icons.edit_outlined),
                               tooltip: 'Edit note',
                               onPressed: () => _editComment(c),
                             ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: 'Delete note',
+                              onPressed: () => _deleteComment(c),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 4),

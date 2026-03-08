@@ -49,9 +49,35 @@ python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
 
 First run will download the model (~80MB).
 
-## 3. Ollama
+## 3. LLM: Groq (primary) → Gemini (fallback) → Ollama (local)
 
-Install from [ollama.ai](https://ollama.ai), then:
+The RAG chat tries **Groq** first; on failure or if unset it uses **Gemini**; then **Ollama** as a local fallback.
+
+### Groq (primary)
+
+1. Get an API key at [console.groq.com](https://console.groq.com).
+2. Add to your env (`backend/.env` or `.env.development.local` locally; Vercel → Environment Variables in production):
+
+   ```
+   GROQ_API_KEY=gsk_your_key_here
+   GROQ_MODEL=llama-3.1-8b-instant
+   ```
+
+### Gemini (fallback)
+
+1. Get an API key at [Google AI Studio](https://aistudio.google.com/apikey).
+2. Add to the same env files:
+
+   ```
+   GEMINI_API_KEY=your_key
+   GEMINI_MODEL=gemini-2.0-flash
+   ```
+
+If Groq fails or is not set, the backend will use Gemini when `GEMINI_API_KEY` is set.
+
+### Ollama (local fallback)
+
+If neither Groq nor Gemini is configured or both fail, the backend uses local Ollama. Install from [ollama.ai](https://ollama.ai), then:
 
 ```bash
 ollama pull llama3

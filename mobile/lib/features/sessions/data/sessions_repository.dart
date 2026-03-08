@@ -179,6 +179,22 @@ class SessionsRepository {
     }
   }
 
+  Future<void> deleteComment(String sessionId, String commentId) async {
+    try {
+      await _api.delete('/api/sessions/$sessionId/comments/$commentId');
+    } on DioException catch (e) {
+      throw _handle(e);
+    }
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    try {
+      await _api.delete('/api/sessions/$sessionId');
+    } on DioException catch (e) {
+      throw _handle(e);
+    }
+  }
+
   AppException _handle(DioException e) {
     final msg = (e.response?.data as Map<String, dynamic>?)?['error'] as String? ?? e.message ?? 'Request failed';
     final code = e.response?.statusCode;
