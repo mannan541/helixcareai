@@ -15,7 +15,8 @@ export type NotificationType =
   | 'signup_pending_approval'    // to admin
   | 'session_logged_for_parent'  // to parent: new session for their child
   | 'session_logged_by_admin'    // to therapist: admin logged a session
-  | 'parent_comment_on_session'; // to therapist + admins: parent added note on session
+  | 'parent_comment_on_session'  // to therapist + admins: parent added note on session
+  | 'staff_comment_on_session';  // to parent: therapist/admin added note on session
 
 /** Create a single notification for a user. */
 export async function create(

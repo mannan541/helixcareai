@@ -71,14 +71,16 @@ export async function getUser(req: Request, res: Response): Promise<void> {
     res.status(404).json({ error: 'User not found' });
     return;
   }
+  const toIsoOrString = (v: string | Date | null | undefined): string | null =>
+    v == null ? null : (v as unknown) instanceof Date ? (v as Date).toISOString() : String(v);
   const payload: { id: string; email: string; fullName: string; role: string; title: string | null; approvedAt?: string | null; disabledAt?: string | null; childIds?: string[]; mobileNumber?: string | null; showMobileToParents?: boolean } = {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
     role: user.role,
     title: user.title,
-    approvedAt: user.approved_at == null ? null : (user.approved_at instanceof Date ? user.approved_at.toISOString() : String(user.approved_at)),
-    disabledAt: user.disabled_at == null ? null : (user.disabled_at instanceof Date ? user.disabled_at.toISOString() : String(user.disabled_at)),
+    approvedAt: toIsoOrString(user.approved_at),
+    disabledAt: toIsoOrString(user.disabled_at),
     mobileNumber: user.mobile_number ?? undefined,
     showMobileToParents: user.role === 'therapist' ? user.show_mobile_to_parents : undefined,
   };
@@ -140,6 +142,8 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
   const search = (req.query.q as string)?.trim() || undefined;
   const pending = req.query.pending === 'true' || req.query.pending === '1';
   const approved = pending ? false : undefined;
+  const toIsoOrString = (v: string | Date | null | undefined): string | null =>
+    v == null ? null : (v as unknown) instanceof Date ? (v as Date).toISOString() : String(v);
   const { users, total } = await authService.findUsers({ role, limit, offset, search, approved });
   res.json({
     users: users.map((u) => ({
@@ -148,8 +152,8 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
       fullName: u.full_name,
       role: u.role,
       title: u.title,
-      approvedAt: u.approved_at == null ? null : (u.approved_at instanceof Date ? u.approved_at.toISOString() : String(u.approved_at)),
-      disabledAt: u.disabled_at == null ? null : (u.disabled_at instanceof Date ? u.disabled_at.toISOString() : String(u.disabled_at)),
+      approvedAt: toIsoOrString(u.approved_at),
+      disabledAt: toIsoOrString(u.disabled_at),
       mobileNumber: u.mobile_number ?? undefined,
       showMobileToParents: u.role === 'therapist' ? u.show_mobile_to_parents : undefined,
     })),
