@@ -25,11 +25,15 @@ class ChildDetailScreen extends StatefulWidget {
 
 class _ChildDetailScreenState extends State<ChildDetailScreen> {
   late ChildEntity _child;
+  bool _canDeleteChild = false;
 
   @override
   void initState() {
     super.initState();
     _child = widget.child;
+    authRepository.me().then((user) {
+      if (mounted) setState(() => _canDeleteChild = user?.isAdmin == true);
+    });
   }
 
   @override
@@ -42,6 +46,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             icon: const Icon(Icons.edit),
             onPressed: () => _openEdit(context),
           ),
+          if (_canDeleteChild)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _confirmDeleteChild(context),
+              tooltip: 'Delete child (admin only)',
+            ),
         ],
       ),
       body: ListView(
@@ -53,10 +63,14 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('ID: ${_child.id}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(context).textTheme.bodySmall?.color)),
+                  ),
                   if (_child.childCode != null && _child.childCode!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
-                      child: Text('Child ID: ${_child.childCode}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      child: Text('Child code: ${_child.childCode}', style: const TextStyle(fontWeight: FontWeight.w600)),
                     ),
                   if (_child.dateOfBirth != null)
                     Padding(
@@ -126,5 +140,36 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       ),
     );
     if (updated != null && mounted) setState(() => _child = updated);
+  }
+
+  Future<void> _confirmDeleteChild(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete child?'),
+        content: Text('This will remove "${_child.fullName}" from the list. Session and therapy data are retained for records. This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await childrenRepository.delete(_child.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Child deleted')));
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: ${e.toString()}')));
+    }
   }
 }
