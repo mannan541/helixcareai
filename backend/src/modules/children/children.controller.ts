@@ -196,15 +196,16 @@ export async function update(req: Request, res: Response): Promise<void> {
   res.json({ child: { ...toChildDto(updated), assignedTherapistIds: therapistIds } });
 }
 
+/** Delete (soft-delete) a child. Admin only. */
 export async function remove(req: Request, res: Response): Promise<void> {
+  if (req.user!.role !== 'admin') {
+    res.status(403).json({ error: 'Only administrators can delete a child' });
+    return;
+  }
   const { id } = req.params;
   const child = await childrenService.findById(id);
   if (!child) {
     res.status(404).json({ error: 'Child not found' });
-    return;
-  }
-  if (!childrenService.canAccessChild(child.user_id, req.user!.userId, req.user!.role)) {
-    res.status(403).json({ error: 'Access denied' });
     return;
   }
   await childrenService.remove(id, req.user!.userId);

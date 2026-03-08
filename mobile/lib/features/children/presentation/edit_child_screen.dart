@@ -479,7 +479,9 @@ class _EditChildScreenState extends State<EditChildScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _therapyCenterId,
+              value: _therapyCenterId != null && _therapyCenterOptions.any((o) => o.id == _therapyCenterId)
+                  ? _therapyCenterId
+                  : null,
               decoration: const InputDecoration(labelText: 'Therapy center'),
               items: [
                 const DropdownMenuItem(value: null, child: Text('—')),
@@ -489,7 +491,9 @@ class _EditChildScreenState extends State<EditChildScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _therapyPlanId,
+              value: _therapyPlanId != null && _therapyPlanOptions.any((o) => o.id == _therapyPlanId)
+                  ? _therapyPlanId
+                  : null,
               decoration: const InputDecoration(labelText: 'Therapy plan'),
               items: [
                 const DropdownMenuItem(value: null, child: Text('—')),

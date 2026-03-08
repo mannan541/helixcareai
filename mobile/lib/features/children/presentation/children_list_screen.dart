@@ -116,13 +116,18 @@ class _ChildrenListViewState extends State<_ChildrenListView> {
                             ? null
                             : Text(subtitleParts.join(' • ')),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).pushNamed(
-                          '/child_detail',
-                          arguments: ChildDetailArgs(
-                            child: c,
-                            childrenBloc: context.read<ChildrenBloc>(),
-                          ),
-                        ),
+                        onTap: () async {
+                          final result = await Navigator.of(context).pushNamed(
+                            '/child_detail',
+                            arguments: ChildDetailArgs(
+                              child: c,
+                              childrenBloc: context.read<ChildrenBloc>(),
+                            ),
+                          );
+                          if (result == true && context.mounted) {
+                            context.read<ChildrenBloc>().add(const ChildrenLoadRequested());
+                          }
+                        },
                       ),
                     );
                   },
