@@ -28,4 +28,10 @@ export const env = {
   /** Local Ollama API for RAG LLM. */
   OLLAMA_URL: process.env.OLLAMA_URL ?? 'http://localhost:11434',
   OLLAMA_MODEL: process.env.OLLAMA_MODEL ?? 'llama3',
+  /** Groq Cloud API for RAG LLM (primary). Get key: https://console.groq.com */
+  GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
+  GROQ_MODEL: process.env.GROQ_MODEL ?? 'llama-3.1-8b-instant',
+  /** Google Gemini API for RAG LLM (fallback when Groq fails or is unset). Get key: https://aistudio.google.com/apikey */
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? '',
+  GEMINI_MODEL: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
 } as const;

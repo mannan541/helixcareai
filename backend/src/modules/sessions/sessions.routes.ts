@@ -73,4 +73,10 @@ router.patch(
   sessionsController.updateComment
 );
 
+router.delete(
+  '/:id/comments/:commentId',
+  validate([param('id').isUUID(), param('commentId').isUUID()]),
+  sessionsController.deleteComment
+);
+
 export default router;

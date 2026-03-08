@@ -339,3 +339,14 @@ export async function updateSessionComment(
     _u_email: u?.email ?? '',
   };
 }
+
+/** Soft-delete a comment. Only the comment author can delete. Returns true if deleted. */
+export async function deleteSessionComment(commentId: string, userId: string): Promise<boolean> {
+  const existing = await findCommentById(commentId);
+  if (!existing || existing.user_id !== userId) return false;
+  const result = await query(
+    'UPDATE session_comments SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2 AND deleted_at IS NULL RETURNING id',
+    [userId, commentId]
+  );
+  return result.length > 0;
+}

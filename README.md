@@ -77,6 +77,17 @@ flutter pub get
 flutter run
 ```
 
+**Deploy mobile (production) — use production URL only**  
+The web app bakes in the API URL at build time. To deploy so the **live site** uses your production backend (not localhost):
+
+```bash
+# From repo root: builds with mobile/.env.production then deploys to Vercel
+./scripts/deploy-mobile-vercel.sh
+```
+
+Or build then deploy manually: `./scripts/build-mobile-production.sh` then `vercel --prod` from repo root.  
+See [Environment: local vs production](docs/ENVIRONMENT.md).
+
 ## Project Structure
 
 ```

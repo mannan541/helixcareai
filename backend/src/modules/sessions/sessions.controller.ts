@@ -150,8 +150,8 @@ export async function update(req: Request, res: Response): Promise<void> {
 
 export async function remove(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
-  if (req.user!.role === 'parent') {
-    res.status(403).json({ error: 'Only admin or therapist can delete a session' });
+  if (req.user!.role !== 'admin') {
+    res.status(403).json({ error: 'Only admin can delete a session' });
     return;
   }
   const allowed = await sessionsService.canAccessSession(id, req.user!.userId, req.user!.role);
@@ -249,4 +249,19 @@ export async function updateComment(req: Request, res: Response): Promise<void> 
       user: { id: updated._u_id, fullName: updated._u_full_name, email: updated._u_email },
     },
   });
+}
+
+export async function deleteComment(req: Request, res: Response): Promise<void> {
+  const { id: sessionId, commentId } = req.params;
+  const allowed = await sessionsService.canAccessSession(sessionId, req.user!.userId, req.user!.role);
+  if (!allowed) {
+    res.status(403).json({ error: 'Access denied' });
+    return;
+  }
+  const deleted = await sessionsService.deleteSessionComment(commentId, req.user!.userId);
+  if (!deleted) {
+    res.status(404).json({ error: 'Comment not found or you can only delete your own notes' });
+    return;
+  }
+  res.status(204).send();
 }

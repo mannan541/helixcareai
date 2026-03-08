@@ -36,7 +36,11 @@ Override with `backend/.env.development.local` for machine-specific or secret va
 | `POSTGRES_URL` or `DATABASE_URL` | Yes | From Vercel Postgres or Neon |
 | `JWT_SECRET`      | Yes      | Long random string; never use dev secret |
 | `JWT_EXPIRES_IN`  | Optional | e.g. `7d` |
-| `OPENAI_API_KEY`  | Optional | For RAG features |
+| `OPENAI_API_KEY`  | Optional | For RAG embeddings |
+| `GROQ_API_KEY`    | Optional | RAG chat primary. Get key: https://console.groq.com |
+| `GROQ_MODEL`      | Optional | e.g. `llama-3.1-8b-instant` (default) |
+| `GEMINI_API_KEY`  | Optional | RAG chat fallback when Groq fails/unset. Get key: https://aistudio.google.com/apikey |
+| `GEMINI_MODEL`    | Optional | e.g. `gemini-2.0-flash` (default) |
 
 See `backend/.env.production.example` for a full checklist.
 
@@ -44,10 +48,12 @@ See `backend/.env.production.example` for a full checklist.
 
 ## Mobile (Flutter web)
 
+**Important:** The API base URL is **baked in at build time**. So the **only** way to get production URL on live is to build with `mobile/.env` containing the production URL (from `.env.production`). Never run `flutter build web --release` for deploy without using production env first.
+
 ### Local development
 
 - **File:** `mobile/.env` (copy from `mobile/.env.example`). This file is gitignored.
-- **Purpose:** Point the app at your **local** backend.
+- **Purpose:** Point the app at your **local** backend only.
 - **Base URL:** `http://localhost:3000` (or `http://10.0.2.2:3000` for Android emulator).
 
 **Typical local `mobile/.env`:**
@@ -55,19 +61,40 @@ See `backend/.env.production.example` for a full checklist.
 API_BASE_URL=http://localhost:3000
 ```
 
-### Production build / CI deploy
+Use this only for `flutter run` (Chrome, devices). Do **not** use this file when building for production deploy.
 
-- **File:** `mobile/.env.production` (committed).
-- **Purpose:** Used by the **Deploy Frontend (main)** workflow and any production build. Must point at the **production** backend URL.
-- **Base URL:** Your production API (e.g. `https://helixacareai.vercel.app`).
+### Production build and deploy
+
+- **File:** `mobile/.env.production` (committed). Must contain your **production** backend URL only.
+- **Purpose:** Used when building the app for production. The built web app will call this URL (e.g. `https://helixacareai.vercel.app`).
 
 **`mobile/.env.production`:**
 ```env
 API_BASE_URL=https://helixacareai.vercel.app
 ```
 
-- **Local:** You use `mobile/.env` (localhost).
-- **CI / production:** CI copies `mobile/.env.production` to `mobile/.env` before `flutter build web`, so the built app uses the production API and keys baked in at build time.
+**To build for production (required before every deploy):**  
+Either run the script (recommended) or copy production env manually:
+
+```bash
+# From repo root — recommended (uses .env.production only)
+./scripts/build-mobile-production.sh
+```
+
+Or manually:
+```bash
+cd mobile
+cp .env.production .env
+flutter build web --release
+```
+
+**To deploy to Vercel (build + deploy in one go):**
+```bash
+# From repo root
+./scripts/deploy-mobile-vercel.sh
+```
+
+This script builds with **only** `.env.production` (so the live app never uses localhost) then runs `vercel --prod`.
 
 ---
 

@@ -39,6 +39,7 @@ class _SessionsView extends StatefulWidget {
 
 class _SessionsViewState extends State<_SessionsView> {
   bool? _canEdit;
+  bool? _canDeleteSession;
   String? _currentUserId;
 
   @override
@@ -47,6 +48,7 @@ class _SessionsViewState extends State<_SessionsView> {
     authRepository.me().then((user) {
       if (mounted) setState(() {
         _canEdit = user != null && (user.isAdmin || user.isTherapist);
+        _canDeleteSession = user?.isAdmin ?? false;
         _currentUserId = user?.id;
       });
     });
@@ -208,6 +210,7 @@ class _SessionsViewState extends State<_SessionsView> {
             canEdit: canEdit,
             canAddNotes: true,
             onSaved: () => bloc.add(SessionsLoadRequested(widget.child.id)),
+            canDeleteSession: _canDeleteSession ?? false,
           ),
         ),
       ),

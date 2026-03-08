@@ -3,6 +3,8 @@ import * as childrenService from '../children/children.service';
 import * as embeddingService from './embeddingService';
 import * as vectorSearchService from './vectorSearchService';
 import * as ollamaService from './ollamaService';
+import * as groqService from './groqService';
+import * as geminiService from './geminiService';
 
 const DEFAULT_TOP_K = 5;
 
@@ -80,8 +82,33 @@ export async function askChildAssistant(
   const notes = await vectorSearchService.findRelevantNotes(childId, embedding, topK);
   const context = notes.length > 0 ? notes.join('\n\n---\n\n') : '';
 
-  const answer = await ollamaService.askLLM(trimmedQuestion, context, {
-    childProfile: childProfile || undefined,
-  });
-  return answer;
+  const llmOptions = { childProfile: childProfile || undefined };
+
+  // Groq (primary) → Gemini (fallback) → Ollama (local)
+  const tryGroq = () => groqService.askLLM(trimmedQuestion, context, llmOptions);
+  const tryGemini = () => geminiService.askLLM(trimmedQuestion, context, llmOptions);
+  const tryOllama = () => ollamaService.askLLM(trimmedQuestion, context, llmOptions);
+
+  if (groqService.isConfigured()) {
+    try {
+      return await tryGroq();
+    } catch {
+      if (geminiService.isConfigured()) {
+        try {
+          return await tryGemini();
+        } catch {
+          return await tryOllama();
+        }
+      }
+      return await tryOllama();
+    }
+  }
+  if (geminiService.isConfigured()) {
+    try {
+      return await tryGemini();
+    } catch {
+      return await tryOllama();
+    }
+  }
+  return await tryOllama();
 }
