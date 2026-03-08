@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import 'auth_bloc.dart';
 
+/// Set to true to show the "Create account" button on the login screen.
+const bool _showSignupButton = false;
+
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
@@ -98,11 +101,13 @@ class _LoginViewState extends State<_LoginView> {
                                 },
                           child: loading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Sign in'),
                         ),
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: loading ? null : () => Navigator.of(context).pushReplacementNamed('/register'),
-                          child: const Text('Create account'),
-                        ),
+                        if (_showSignupButton) ...[
+                          const SizedBox(height: 16),
+                          TextButton(
+                            onPressed: loading ? null : () => Navigator.of(context).pushReplacementNamed('/register'),
+                            child: const Text('Create account'),
+                          ),
+                        ],
                       ],
                     );
                   },

@@ -37,6 +37,15 @@ BEGIN
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
+-- is_active: false when user is disabled or soft-deleted (data integrity + compliance).
+DO $$
+BEGIN
+  ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+-- Backfill: set is_active = false where disabled or deleted (run after column exists)
+DO $$ BEGIN UPDATE users SET is_active = false WHERE (disabled_at IS NOT NULL OR deleted_at IS NOT NULL); END $$;
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
@@ -60,9 +69,10 @@ EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
 -- ============== CHILDREN ==============
+-- ON DELETE RESTRICT: do not cascade delete; preserve child/therapy data when user is soft-deleted.
 CREATE TABLE IF NOT EXISTS children (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   first_name    VARCHAR(255) NOT NULL,
   last_name     VARCHAR(255) NOT NULL,
   date_of_birth DATE,
@@ -77,6 +87,15 @@ CREATE TABLE IF NOT EXISTS children (
   deleted_at    TIMESTAMPTZ
 );
 
+-- Ensure children FK is RESTRICT (for DBs created before this change).
+DO $$
+BEGIN
+  ALTER TABLE children DROP CONSTRAINT IF EXISTS children_user_id_fkey;
+  ALTER TABLE children ADD CONSTRAINT children_user_id_fkey
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT;
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_children_user_id ON children(user_id);
 
 -- Add optional columns if table already existed without them
@@ -347,6 +366,21 @@ CREATE INDEX IF NOT EXISTS idx_chat_logs_created_at ON chat_logs(created_at);
 -- ============== INDEXES FOR ADDED COLUMNS (after columns exist via CREATE or ALTER)
 CREATE INDEX IF NOT EXISTS idx_sessions_therapist_id ON sessions(therapist_id);
 CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);
+
+-- ============== AUDIT LOGS (compliance: who did what, when) ==============
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  action     VARCHAR(100) NOT NULL,
+  user_id    UUID REFERENCES users(id) ON DELETE SET NULL,
+  admin_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  details    JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_admin_id ON audit_logs(admin_id);
+
 CREATE INDEX IF NOT EXISTS idx_children_deleted_at ON children(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_deleted_at ON sessions(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_embeddings_deleted_at ON embeddings(deleted_at);

@@ -65,7 +65,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
   if (user.disabled_at) {
-    res.status(403).json({ error: 'Account is disabled. Contact an administrator.' });
+    res.status(403).json({ error: 'Your account has been disabled. Contact support.' });
     return;
   }
   const valid = await authService.verifyPassword(password, user.password_hash);
