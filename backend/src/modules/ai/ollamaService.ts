@@ -6,7 +6,7 @@ const MODEL = env.OLLAMA_MODEL;
 
 const SYSTEM_PROMPT = `You are a therapy assistant helping therapists and parents understand a child's therapy progress and profile.
 Use the Child Profile and Therapy Notes below to answer the question accurately.
-Answer clearly and professionally.`;
+Answer clearly and professionally in English. Format any dates in English (e.g. 4 Mar 2025, 2:30 PM).`;
 
 function buildPrompt(context: string, question: string, childProfile?: string): string {
   const profileSection =

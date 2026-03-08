@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { queryOne } from '../../config/database';
 import * as authService from '../auth/auth.service';
+import * as auditService from '../audit/audit.service';
 import * as childrenService from '../children/children.service';
 
 const DEFAULT_PASSWORD = '12345678';
@@ -179,6 +180,12 @@ export async function disableUser(req: Request, res: Response): Promise<void> {
     res.status(400).json({ error: 'User is already disabled or not found' });
     return;
   }
+  await auditService.log({
+    action: 'user_disabled',
+    userId: id,
+    adminId: req.user!.userId,
+    details: { email: user.email, fullName: user.full_name, role: user.role },
+  }).catch((err) => console.error('[audit] log user_disabled failed:', err));
   res.json({
     user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role, title: user.title, disabledAt: new Date().toISOString() },
     message: 'User disabled. They cannot sign in and will be logged out on next request.',
@@ -219,6 +226,12 @@ export async function deleteUser(req: Request, res: Response): Promise<void> {
     res.status(400).json({ error: 'User not found or already deleted' });
     return;
   }
+  await auditService.log({
+    action: 'user_deleted',
+    userId: id,
+    adminId: req.user!.userId,
+    details: { email: user.email, fullName: user.full_name, role: user.role },
+  }).catch((err) => console.error('[audit] log user_deleted failed:', err));
   res.json({
     message: 'User deleted. They cannot sign in and will be logged out on next request.',
   });

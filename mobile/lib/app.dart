@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'features/auth/domain/user_entity.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
@@ -43,6 +44,15 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
       title: 'HelixCareAI',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      locale: const Locale('en', 'US'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+      ],
       initialRoute: '/login',
       routes: {
         '/login': (_) => const LoginScreen(),

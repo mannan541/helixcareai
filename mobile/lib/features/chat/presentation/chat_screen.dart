@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/utils/date_format.dart';
@@ -101,9 +102,79 @@ class _ChatViewState extends State<_ChatView> {
                       children: [
                         SelectableText(m.content, style: const TextStyle(fontSize: 15)),
                         const SizedBox(height: 4),
-                        SelectableText(
-                          _formatTime(m.createdAt),
-                          style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            SelectableText(
+                              _formatTime(m.createdAt),
+                              style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color),
+                            ),
+                            if (isUser)
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 18),
+                                onPressed: state.isSending
+                                    ? null
+                                    : () {
+                                        context.read<ChatBloc>().add(ChatTrimMessagesToIndex(i));
+                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          _controller.text = m.content;
+                                          _controller.selection = TextSelection.collapsed(offset: m.content.length);
+                                        });
+                                      },
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                tooltip: 'Edit and resend',
+                              )
+                            else
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.copy, size: 18),
+                                    onPressed: () {
+                                      Clipboard.setData(ClipboardData(text: m.content));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Copied to clipboard')),
+                                      );
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    tooltip: 'Copy',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.thumb_up_outlined, size: 18),
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Thanks for your feedback')),
+                                      );
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    tooltip: 'Good response',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.thumb_down_outlined, size: 18),
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Thanks for your feedback')),
+                                      );
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    tooltip: 'Poor response',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh, size: 18),
+                                    onPressed: state.isSending
+                                        ? null
+                                        : () => context.read<ChatBloc>().add(ChatRetryRequested(widget.child.id, i)),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    tooltip: 'Try again',
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
                       ],
                     ),
@@ -127,8 +198,12 @@ class _ChatViewState extends State<_ChatView> {
                     Expanded(
                       child: TextField(
                         controller: _controller,
-                        decoration: const InputDecoration(hintText: 'Ask about this child...'),
-                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          hintText: 'Ask about this child...',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 1,
+                        textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _send(context),
                       ),
                     ),

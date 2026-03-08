@@ -154,7 +154,7 @@ export async function getAdminUserIds(): Promise<string[]> {
 /** Disable user (they cannot login; existing token will be rejected on next request). Returns true if updated. */
 export async function disableUser(id: string): Promise<boolean> {
   const result = await query(
-    'UPDATE users SET disabled_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL RETURNING id',
+    'UPDATE users SET disabled_at = NOW(), is_active = false, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NULL RETURNING id',
     [id]
   );
   return result.length > 0;
@@ -163,16 +163,16 @@ export async function disableUser(id: string): Promise<boolean> {
 /** Re-enable a disabled user. Returns true if updated. */
 export async function enableUser(id: string): Promise<boolean> {
   const result = await query(
-    'UPDATE users SET disabled_at = NULL, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NOT NULL RETURNING id',
+    'UPDATE users SET disabled_at = NULL, is_active = true, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NOT NULL RETURNING id',
     [id]
   );
   return result.length > 0;
 }
 
-/** Soft-delete user (set deleted_at; they cannot login; existing token rejected). Returns true if updated. */
+/** Soft-delete user (set deleted_at; they cannot login; existing token rejected). Children/therapy data remain. Returns true if updated. */
 export async function deleteUser(id: string, deletedByUserId: string): Promise<boolean> {
   const result = await query(
-    'UPDATE users SET deleted_at = NOW(), deleted_by = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING id',
+    'UPDATE users SET deleted_at = NOW(), deleted_by = $1, is_active = false, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING id',
     [deletedByUserId, id]
   );
   return result.length > 0;
