@@ -117,11 +117,12 @@ class _ChildrenListViewState extends State<_ChildrenListView> {
                             : Text(subtitleParts.join(' • ')),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () async {
-                          final result = await Navigator.of(context).pushNamed(
-                            '/child_detail',
-                            arguments: ChildDetailArgs(
-                              child: c,
-                              childrenBloc: context.read<ChildrenBloc>(),
+                          final result = await Navigator.of(context).push<bool?>(
+                            MaterialPageRoute<bool?>(
+                              builder: (_) => ChildDetailScreen(
+                                child: c,
+                                childrenBloc: context.read<ChildrenBloc>(),
+                              ),
                             ),
                           );
                           if (result == true && context.mounted) {

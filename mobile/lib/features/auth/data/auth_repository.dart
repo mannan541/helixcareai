@@ -115,19 +115,25 @@ class AuthRepository {
     return 0;
   }
 
-  /// Admin only. List users with optional role filter, search, and pending-only filter.
+  /// Admin only. List users with optional role filter, search, pending-only, archived, and sort.
   Future<UsersListResponse> listUsers({
     String? role,
     int limit = 50,
     int offset = 0,
     String? search,
     bool pendingOnly = false,
+    bool archivedOnly = false,
+    String? sortBy,
+    String? sortOrder,
   }) async {
     try {
       final queryParams = <String, dynamic>{'limit': limit, 'offset': offset};
       if (role != null && role.isNotEmpty) queryParams['role'] = role;
       if (search != null && search.trim().isNotEmpty) queryParams['q'] = search.trim();
       if (pendingOnly) queryParams['pending'] = 'true';
+      if (archivedOnly) queryParams['archived'] = 'true';
+      if (sortBy != null && sortBy.isNotEmpty) queryParams['sortBy'] = sortBy;
+      if (sortOrder != null && sortOrder.isNotEmpty) queryParams['sortOrder'] = sortOrder;
       final data = await _api.get<Map<String, dynamic>>(
         '/api/admin/users',
         queryParameters: queryParams,
@@ -349,8 +355,10 @@ class AuthRepository {
         : null;
     final approvedAtRaw = j['approvedAt'] ?? j['approved_at'];
     final disabledAtRaw = j['disabledAt'] ?? j['disabled_at'];
+    final deletedAtRaw = j['deletedAt'] ?? j['deleted_at'];
     final DateTime? approvedAt = _parseOptionalDateTime(approvedAtRaw);
     final DateTime? disabledAt = _parseOptionalDateTime(disabledAtRaw);
+    final DateTime? deletedAt = _parseOptionalDateTime(deletedAtRaw);
     final mobileRaw = j['mobileNumber'] ?? j['mobile_number'];
     final showRaw = j['showMobileToParents'] ?? j['show_mobile_to_parents'];
     return UserEntity(
@@ -362,6 +370,7 @@ class AuthRepository {
       childIds: childIds,
       approvedAt: approvedAt,
       disabledAt: disabledAt,
+      deletedAt: deletedAt,
       mobileNumber: mobileRaw != null ? mobileRaw as String? : null,
       showMobileToParents: showRaw is bool ? showRaw : null,
     );
