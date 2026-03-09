@@ -7,7 +7,6 @@ import '../../admin/presentation/add_user_screen.dart';
 import '../../auth/domain/user_entity.dart';
 import '../domain/session_entity.dart';
 import '../../children/domain/child_entity.dart';
-import 'sessions_bloc.dart';
 
 class SessionFormScreen extends StatefulWidget {
   const SessionFormScreen({
@@ -40,6 +39,8 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   /// Last therapist selected in the session form (for new sessions).
   static UserEntity? _lastSelectedTherapist;
 
+  List<UserEntity>? _assignedTherapists;
+
   final _formKey = GlobalKey<FormState>();
   late DateTime _date;
   final _durationController = TextEditingController();
@@ -54,7 +55,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   void initState() {
     super.initState();
     _date = widget.session?.sessionDate ?? DateTime.now();
-    _durationController.text = widget.session?.durationMinutes?.toString() ?? '';
+    _durationController.text = widget.session?.durationMinutes?.toString() ?? '45';
     _notesController.text = widget.session?.notesText ?? '';
     final metrics = widget.session?.structuredMetrics ?? {};
     final session = widget.session;
@@ -78,15 +79,43 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       _selectedTherapist = null;
       _therapyTitle = metrics['therapyTitle'] as String?;
     }
-    _timeSlotController.text = metrics['timeSlot']?.toString() ?? '';
+    String autoTimeSlot = '';
+    if (session == null) {
+      final now = DateTime.now();
+      final target = now.subtract(const Duration(minutes: 45));
+      final startOfWork = DateTime(target.year, target.month, target.day, 9, 0);
+      int diffMins = target.difference(startOfWork).inMinutes;
+      if (diffMins < 0) diffMins = 0;
+      final slotIndex = diffMins ~/ 45;
+      final slotStart = startOfWork.add(Duration(minutes: slotIndex * 45));
+      final slotEnd = slotStart.add(const Duration(minutes: 45));
+      String fmt(DateTime d) {
+        final h = d.hour > 12 ? d.hour - 12 : (d.hour == 0 ? 12 : d.hour);
+        final ampm = d.hour >= 12 ? 'PM' : 'AM';
+        return '$h:${d.minute.toString().padLeft(2, '0')} $ampm';
+      }
+      autoTimeSlot = '${fmt(slotStart)} - ${fmt(slotEnd)}';
+    }
+    _timeSlotController.text = metrics['timeSlot']?.toString() ?? autoTimeSlot;
     for (final e in metrics.entries) {
       _metricControllers[e.key] = TextEditingController(text: e.value?.toString() ?? '');
     }
     if (_metricControllers.isEmpty) {
-      _metricControllers['engagement'] = TextEditingController();
-      _metricControllers['focus'] = TextEditingController();
-      _metricControllers['communication'] = TextEditingController();
+      _metricControllers['engagement'] = TextEditingController(text: '5');
+      _metricControllers['focus'] = TextEditingController(text: '5');
+      _metricControllers['communication'] = TextEditingController(text: '5');
     }
+    _loadChildTherapists();
+  }
+
+  Future<void> _loadChildTherapists() async {
+    final ids = widget.child.assignedTherapistIds ?? (widget.child.assignedTherapistId != null ? [widget.child.assignedTherapistId!] : null);
+    if (ids == null || ids.isEmpty) return;
+    try {
+      final res = await authRepository.getTherapists(limit: 500, offset: 0);
+      final list = res.users.where((u) => ids.contains(u.id)).toList();
+      if (mounted) setState(() => _assignedTherapists = list);
+    } catch (_) {}
   }
 
   Future<void> _resolveTherapistById(String therapistId) async {
@@ -180,24 +209,22 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                 return FilterChip(
                   label: Text(t),
                   selected: selected,
-                  onSelected: (v) => setState(() => _therapyTitle = v ? t : null),
+                  onSelected: (v) {
+                    setState(() {
+                      _therapyTitle = v ? t : null;
+                      if (v && _assignedTherapists != null) {
+                        for (final therapist in _assignedTherapists!) {
+                          if (_therapyTitleFromTherapistTitle(therapist.title) == t) {
+                            _selectedTherapist = therapist;
+                            break;
+                          }
+                        }
+                      }
+                    });
+                  },
                 );
               }).toList(),
             ),
-            const SizedBox(height: 20),
-            const Text('Structured metrics', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            ..._metricControllers.entries.map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: TextFormField(
-                    controller: e.value,
-                    decoration: InputDecoration(
-                      labelText: _metricLabel(e.key),
-                      hintText: '1-10 or value',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                )),
             const SizedBox(height: 16),
             ListTile(
               title: const Text('Date'),
@@ -227,9 +254,45 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
               decoration: const InputDecoration(labelText: 'Duration (minutes)'),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 16),
-            const Text('Therapist Notes (free text)', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            const Text('Structured metrics', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+            ..._metricControllers.entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextFormField(
+                    controller: e.value,
+                    decoration: InputDecoration(
+                      labelText: _metricLabel(e.key),
+                      hintText: '1-10 or value',
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                )),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Therapist Notes (free text)', style: TextStyle(fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.format_list_bulleted, size: 20),
+                  tooltip: 'Add bullet point',
+                  onPressed: () {
+                    final text = _notesController.text;
+                    final selection = _notesController.selection;
+                    const bullet = '• ';
+                    if (selection.isValid) {
+                      final newText = text.replaceRange(selection.start, selection.end, bullet);
+                      _notesController.value = TextEditingValue(
+                        text: newText,
+                        selection: TextSelection.collapsed(offset: selection.start + bullet.length),
+                      );
+                    } else {
+                      _notesController.text = text + bullet;
+                    }
+                  },
+                ),
+              ],
+            ),
             TextFormField(
               controller: _notesController,
               decoration: const InputDecoration(hintText: 'Therapist notes...'),
