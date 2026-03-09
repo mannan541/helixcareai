@@ -6,23 +6,26 @@ import 'child_detail_screen.dart';
 import 'children_bloc.dart';
 
 class ChildrenListScreen extends StatelessWidget {
-  const ChildrenListScreen({super.key});
+  const ChildrenListScreen({super.key, this.showAppBar = true});
+  final bool showAppBar;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => ChildrenBloc(childrenRepository)..add(const ChildrenLoadRequested()),
-      child: const _ChildrenListView(),
+      child: _ChildrenListView(showAppBar: showAppBar),
     );
   }
 }
 
 class _ChildrenListView extends StatefulWidget {
-  const _ChildrenListView();
+  const _ChildrenListView({required this.showAppBar});
+  final bool showAppBar;
 
   @override
   State<_ChildrenListView> createState() => _ChildrenListViewState();
 }
+
 
 class _ChildrenListViewState extends State<_ChildrenListView> {
   bool _canAddChild = false;
@@ -138,7 +141,7 @@ class _ChildrenListViewState extends State<_ChildrenListView> {
             );
           }
           return Scaffold(
-            appBar: AppBar(
+            appBar: widget.showAppBar ? AppBar(
               title: const Text('Children'),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(56),
@@ -174,8 +177,31 @@ class _ChildrenListViewState extends State<_ChildrenListView> {
                   onPressed: () => _confirmLogout(context),
                 ),
               ],
+            ) : PreferredSize(
+              preferredSize: const Size.fromHeight(72),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search children...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      isDense: true,
+                      filled: true,
+                    ),
+                    onSubmitted: (q) {
+                        context.read<ChildrenBloc>().add(ChildrenLoadRequested(search: q.isEmpty ? null : q));
+                    },
+                    onChanged: (q) {
+                        if (q.isEmpty) {
+                            context.read<ChildrenBloc>().add(const ChildrenLoadRequested(search: null));
+                        }
+                    },
+                ),
+              ),
             ),
             body: body,
+
             floatingActionButton: state.children.isNotEmpty && _canAddChild
                 ? FloatingActionButton(
                     onPressed: () => _showAddChild(context),

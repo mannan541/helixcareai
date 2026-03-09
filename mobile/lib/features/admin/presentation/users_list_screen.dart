@@ -4,16 +4,18 @@ import '../../auth/domain/user_entity.dart';
 import '../../auth/data/auth_repository.dart';
 
 class UsersListScreen extends StatefulWidget {
-  const UsersListScreen({super.key, this.roleFilter, this.pendingOnly = false});
+  const UsersListScreen({super.key, this.roleFilter, this.pendingOnly = false, this.showAppBar = true});
 
   /// Optional role filter: 'therapist', 'parent', or null for all users.
   final String? roleFilter;
   /// When true, show only pending (unapproved) signups and an Approve action.
   final bool pendingOnly;
+  final bool showAppBar;
 
   @override
   State<UsersListScreen> createState() => _UsersListScreenState();
 }
+
 
 class _UsersListScreenState extends State<UsersListScreen> with TickerProviderStateMixin {
   List<UserEntity> _users = [];
@@ -213,7 +215,7 @@ class _UsersListScreenState extends State<UsersListScreen> with TickerProviderSt
         ? 'Pending approvals'
         : (_showArchived ? 'Archived users' : (widget.roleFilter == null && _roleFilter == null ? 'All users' : 'Users (${_roleFilter ?? widget.roleFilter})'));
     return Scaffold(
-        appBar: AppBar(
+        appBar: widget.showAppBar ? AppBar(
           title: Text(title),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -236,7 +238,20 @@ class _UsersListScreenState extends State<UsersListScreen> with TickerProviderSt
                 onPressed: _openAddUser,
               ),
           ],
-        ),
+        ) : (!widget.pendingOnly ? PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Material(
+            color: Theme.of(context).colorScheme.surface,
+            child: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Active'),
+                Tab(text: 'Archived'),
+              ],
+            ),
+          ),
+        ) : null),
+
         body: Column(
           children: [
             Padding(

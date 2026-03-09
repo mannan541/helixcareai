@@ -7,38 +7,59 @@ import '../../children/domain/child_entity.dart';
 import 'chat_bloc.dart';
 
 class ChatScreen extends StatelessWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({super.key, this.showAppBar = true});
+  final bool showAppBar;
 
   @override
   Widget build(BuildContext context) {
     final child = ModalRoute.of(context)?.settings.arguments;
     if (child is! ChildEntity) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Chat')),
-        body: const Center(child: Text('Select a child from the list first.')),
+        appBar: showAppBar ? AppBar(title: const Text('Chat')) : null,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.chat_outlined, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text('Select a child from the Children list to start a chat.'),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () {
+                  // If we are in MainScreen, we might want to switch tabs.
+                  // For now, just a hint is fine or we can use a callback.
+                },
+                child: const Text('Go to Children'),
+              ),
+            ],
+          ),
+        ),
       );
     }
     return BlocProvider(
       create: (_) => ChatBloc(chatRepository)..add(ChatLoadHistoryRequested(child.id)),
-      child: _ChatView(child: child),
+      child: _ChatView(child: child, showAppBar: showAppBar),
     );
   }
 }
 
 class _ChatView extends StatefulWidget {
-  const _ChatView({required this.child});
+  const _ChatView({required this.child, required this.showAppBar});
 
   final ChildEntity child;
+  final bool showAppBar;
 
   @override
   State<_ChatView> createState() => _ChatViewState();
 }
+
 
 class _ChatViewState extends State<_ChatView> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
 
   @override
+
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
@@ -48,13 +69,16 @@ class _ChatViewState extends State<_ChatView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Chat — ${widget.child.fullName}')),
+      appBar: widget.showAppBar ? AppBar(title: Text('Chat — ${widget.child.fullName}')) : null,
       body: BlocConsumer<ChatBloc, ChatState>(
+
         listener: (context, state) {
           if (state.error != null) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.error!)));
           }
         },
+
+
         builder: (context, state) {
           Widget listContent;
           if (state.isLoading && state.messages.isEmpty) {
@@ -82,10 +106,11 @@ class _ChatViewState extends State<_ChatView> {
           } else {
             listContent = ListView.builder(
               controller: _scrollController,
+              reverse: true,
               padding: const EdgeInsets.all(16),
               itemCount: state.messages.length,
               itemBuilder: (context, i) {
-                final m = state.messages[i];
+                final m = state.messages[state.messages.length - 1 - i];
                 final isUser = m.role == 'user';
                 return Align(
                   alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -115,7 +140,7 @@ class _ChatViewState extends State<_ChatView> {
                                 onPressed: state.isSending
                                     ? null
                                     : () {
-                                        context.read<ChatBloc>().add(ChatTrimMessagesToIndex(i));
+                                        context.read<ChatBloc>().add(ChatTrimMessagesToIndex(state.messages.length - 1 - i));
                                         WidgetsBinding.instance.addPostFrameCallback((_) {
                                           _controller.text = m.content;
                                           _controller.selection = TextSelection.collapsed(offset: m.content.length);
@@ -167,7 +192,7 @@ class _ChatViewState extends State<_ChatView> {
                                     icon: const Icon(Icons.refresh, size: 18),
                                     onPressed: state.isSending
                                         ? null
-                                        : () => context.read<ChatBloc>().add(ChatRetryRequested(widget.child.id, i)),
+                                        : () => context.read<ChatBloc>().add(ChatRetryRequested(widget.child.id, state.messages.length - 1 - i)),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     tooltip: 'Try again',
@@ -182,6 +207,7 @@ class _ChatViewState extends State<_ChatView> {
                 );
               },
             );
+
           }
           return Column(
             children: [

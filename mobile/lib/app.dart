@@ -4,6 +4,7 @@ import 'features/auth/domain/user_entity.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/register_screen.dart';
 import 'features/auth/presentation/edit_profile_screen.dart';
+import 'features/auth/presentation/splash_screen.dart';
 import 'features/children/presentation/child_detail_screen.dart';
 import 'features/children/presentation/children_list_screen.dart';
 import 'features/sessions/presentation/sessions_screen.dart';
@@ -17,8 +18,10 @@ import 'features/analytics/presentation/analytics_screen.dart';
 import 'features/notifications/presentation/notifications_screen.dart';
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
+import 'core/presentation/screens/main_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 
 class HelixCareAIApp extends StatefulWidget {
   const HelixCareAIApp({super.key});
@@ -53,14 +56,12 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
       supportedLocales: const [
         Locale('en', 'US'),
       ],
-      initialRoute: '/login',
+      initialRoute: '/',
       routes: {
+        '/': (_) => const SplashScreen(),
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
-        '/dashboard': (ctx) {
-          final args = ModalRoute.of(ctx)?.settings.arguments;
-          return DashboardScreen(initialUser: args is UserEntity ? args : null);
-        },
+        '/dashboard': (_) => const MainScreen(),
         '/children': (_) => const ChildrenListScreen(),
         '/users': (ctx) {
           final args = ModalRoute.of(ctx)?.settings.arguments;
