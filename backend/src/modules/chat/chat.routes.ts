@@ -10,7 +10,7 @@ router.use(authMiddleware);
 router.post(
   '/ask',
   validate([
-    body('childId').isUUID(),
+    body('childId').optional({ nullable: true }).isUUID(),
     body('question').trim().notEmpty(),
   ]),
   chatController.ask
@@ -18,8 +18,11 @@ router.post(
 
 router.get(
   '/history/:childId',
-  validate([param('childId').isUUID()]),
+  validate([
+    param('childId').custom((val) => val === 'global' || /^[0-9a-f-]{36}$/i.test(val)),
+  ]),
   chatController.history
 );
+
 
 export default router;

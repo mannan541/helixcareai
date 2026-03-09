@@ -6,7 +6,7 @@ export async function ask(req: Request, res: Response): Promise<void> {
     res.status(401).json({ error: 'Authentication required' });
     return;
   }
-  const { childId, question } = req.body as { childId: string; question: string };
+  const { childId, question } = req.body as { childId: string | null; question: string };
   try {
     const { answer } = await chatService.ask(req.user.userId, req.user.role, childId, question.trim());
     res.json({ answer });
@@ -22,8 +22,9 @@ export async function history(req: Request, res: Response): Promise<void> {
     return;
   }
   const { childId } = req.params;
+  const realChildId = childId === 'global' ? null : childId;
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
-  const logs = await chatService.getHistory(req.user.userId, childId, limit);
+  const logs = await chatService.getHistory(req.user.userId, realChildId, limit);
   res.json({
     messages: logs.reverse().map((l) => ({
       id: l.id,

@@ -128,3 +128,51 @@ export async function askChildAssistant(
   }
   return await tryOllama();
 }
+/**
+ * RAG: global assistant for all accessible children.
+ */
+export async function askGlobalAssistant(
+  childIds: string[],
+  question: string,
+  options: { topK?: number } = {}
+): Promise<string> {
+  const trimmedQuestion = question.trim();
+  if (!trimmedQuestion) throw new Error('Question cannot be empty');
+  if (!childIds.length) return 'I don\'t see any children profiles to talk about.';
+
+  const topK = options.topK ?? DEFAULT_TOP_K;
+
+  // Gathering summaries for better global overview
+  const children = await Promise.all(childIds.map(id => childrenService.findById(id)));
+  const childrenContext = children.filter(Boolean).map(c => `- ${c!.first_name} ${c!.last_name} (${c!.status ?? 'active'}, diag: ${c!.diagnosis_type ?? 'none'})`).join('\n');
+
+  let context = 'Summary of accessible children:\n' + childrenContext + '\n\n';
+  try {
+    const embedding = await embeddingService.generateEmbedding(trimmedQuestion);
+    // Find relevant notes across ALL provided child IDs
+    const vectorStr = `[${embedding.join(',')}]`;
+    const rows = await vectorSearchService.searchAllChildren(childIds, vectorStr, topK);
+    if (rows.length > 0) {
+      context += 'Relevant session notes:\n' + rows.join('\n---\n');
+    }
+  } catch (e) {
+    // If embedding fails, user still gets answer from children names list
+  }
+
+  const llmOptions = { childProfile: 'Global Assistant Mode: Answering based on all managed children and clinic data.' };
+
+  const tryGroq = () => groqService.askLLM(trimmedQuestion, context, llmOptions);
+  const tryGemini = () => geminiService.askLLM(trimmedQuestion, context, llmOptions);
+  const tryOllama = () => ollamaService.askLLM(trimmedQuestion, context, llmOptions);
+
+  if (groqService.isConfigured()) {
+    try { return await tryGroq(); } catch {
+      if (geminiService.isConfigured()) { try { return await tryGemini(); } catch { return await tryOllama(); } }
+      return await tryOllama();
+    }
+  }
+  if (geminiService.isConfigured()) {
+    try { return await tryGemini(); } catch { return await tryOllama(); }
+  }
+  return await tryOllama();
+}

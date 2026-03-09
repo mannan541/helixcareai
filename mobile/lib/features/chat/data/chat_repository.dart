@@ -21,10 +21,11 @@ class ChatRepository {
 
   ChatRepository(this._api);
 
-  Future<List<ChatMessage>> getHistory(String childId, {int limit = 50}) async {
+  Future<List<ChatMessage>> getHistory(String? childId, {int limit = 50}) async {
     try {
+      final id = childId ?? 'global';
       final data = await _api.get<Map<String, dynamic>>(
-        '/api/chat/history/$childId',
+        '/api/chat/history/$id',
         queryParameters: {'limit': limit},
       );
       final list = data!['messages'] as List<dynamic>? ?? [];
@@ -42,7 +43,7 @@ class ChatRepository {
     }
   }
 
-  Future<String> ask(String childId, String question) async {
+  Future<String> ask(String? childId, String question) async {
     try {
       final data = await _api.post<Map<String, dynamic>>(
         '/api/chat/ask',
@@ -54,6 +55,7 @@ class ChatRepository {
       throw _handle(e);
     }
   }
+
 
   AppException _handle(DioException e) {
     final msg = (e.response?.data as Map<String, dynamic>?)?['error'] as String? ?? e.message ?? 'Request failed';
