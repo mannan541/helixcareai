@@ -4,6 +4,7 @@ import { signToken } from './auth.service';
 import * as childrenService from '../children/children.service';
 import * as sessionsService from '../sessions/sessions.service';
 import * as notificationsEmit from '../notifications/notifications.emit';
+import * as auditService from '../audit/audit.service';
 
 export async function listTherapists(req: Request, res: Response): Promise<void> {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
@@ -38,6 +39,31 @@ export async function register(req: Request, res: Response): Promise<void> {
   };
   const existing = await authService.findUserByEmail(email);
   if (existing) {
+    // If the email belongs to a user that is not currently active (disabled or soft-deleted), reactivate that account instead of failing.
+    if (!existing.is_active || existing.deleted_at || existing.disabled_at) {
+      await authService.reactivateUserForSignup(existing.id);
+      await auditService
+        .log({
+          action: 'user_reactivated_via_signup',
+          userId: existing.id,
+          adminId: null,
+          details: { email: existing.email },
+        })
+        .catch((err) => console.error('[audit] user_reactivated_via_signup failed:', err));
+
+      res.status(200).json({
+        user: {
+          id: existing.id,
+          email: existing.email,
+          fullName: existing.full_name,
+          role: existing.role,
+          title: existing.title,
+        },
+        message:
+          'We found an existing account for this email and are reactivating it. You can sign in once your account is approved.',
+      });
+      return;
+    }
     res.status(409).json({ error: 'Email already registered' });
     return;
   }

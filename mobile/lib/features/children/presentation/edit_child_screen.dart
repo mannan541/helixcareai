@@ -268,10 +268,13 @@ class _EditChildScreenState extends State<EditChildScreen> {
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _gender,
               decoration: const InputDecoration(labelText: 'Gender'),
-              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._genderOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._genderOptions.map((o) => DropdownMenuItem<String?>(value: o, child: Text(o))),
+              ],
               onChanged: (v) => setState(() => _gender = v),
             ),
             const SizedBox(height: 12),
@@ -326,12 +329,12 @@ class _EditChildScreenState extends State<EditChildScreen> {
               decoration: const InputDecoration(labelText: 'Diagnosis (optional)', hintText: 'e.g. ASD'),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _diagnosisType,
               decoration: const InputDecoration(labelText: 'Diagnosis type'),
               items: [
-                const DropdownMenuItem(value: null, child: Text('—')),
-                ..._diagnosisTypeOptions.map((o) => DropdownMenuItem(value: o, child: Text(o))),
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._diagnosisTypeOptions.map((o) => DropdownMenuItem<String?>(value: o, child: Text(o))),
               ],
               onChanged: (v) => setState(() => _diagnosisType = v),
             ),
@@ -346,10 +349,13 @@ class _EditChildScreenState extends State<EditChildScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _autismLevel,
               decoration: const InputDecoration(labelText: 'Autism level'),
-              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._autismLevelOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._autismLevelOptions.map((o) => DropdownMenuItem<String?>(value: o, child: Text(o))),
+              ],
               onChanged: (v) => setState(() => _autismLevel = v),
             ),
             const SizedBox(height: 12),
@@ -367,12 +373,12 @@ class _EditChildScreenState extends State<EditChildScreen> {
               },
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _primaryLanguage,
               decoration: const InputDecoration(labelText: 'Primary language'),
               items: [
-                const DropdownMenuItem(value: null, child: Text('—')),
-                ..._primaryLanguageOptions.map((o) => DropdownMenuItem(value: o, child: Text(o))),
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._primaryLanguageOptions.map((o) => DropdownMenuItem<String?>(value: o, child: Text(o))),
               ],
               onChanged: (v) => setState(() => _primaryLanguage = v),
             ),
@@ -384,10 +390,13 @@ class _EditChildScreenState extends State<EditChildScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _communicationType,
               decoration: const InputDecoration(labelText: 'Communication type'),
-              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._communicationTypeOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._communicationTypeOptions.map((o) => DropdownMenuItem<String?>(value: o, child: Text(o))),
+              ],
               onChanged: (v) => setState(() => _communicationType = v),
             ),
             const SizedBox(height: 12),
@@ -452,10 +461,13 @@ class _EditChildScreenState extends State<EditChildScreen> {
               },
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _therapyStatus,
               decoration: const InputDecoration(labelText: 'Therapy status'),
-              items: [const DropdownMenuItem(value: null, child: Text('—')), ..._therapyStatusOptions.map((o) => DropdownMenuItem(value: o, child: Text(o)))],
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._therapyStatusOptions.map((o) => DropdownMenuItem<String?>(value: o, child: Text(o))),
+              ],
               onChanged: (v) => setState(() => _therapyStatus = v),
             ),
             const SizedBox(height: 12),
@@ -478,26 +490,26 @@ class _EditChildScreenState extends State<EditChildScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _therapyCenterId != null && _therapyCenterOptions.any((o) => o.id == _therapyCenterId)
                   ? _therapyCenterId
                   : null,
               decoration: const InputDecoration(labelText: 'Therapy center'),
               items: [
-                const DropdownMenuItem(value: null, child: Text('—')),
-                ..._therapyCenterOptions.map((o) => DropdownMenuItem(value: o.id, child: Text(o.name))),
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._therapyCenterOptions.map((o) => DropdownMenuItem<String?>(value: o.id, child: Text(o.name))),
               ],
               onChanged: (v) => setState(() => _therapyCenterId = v),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<String?>(
               value: _therapyPlanId != null && _therapyPlanOptions.any((o) => o.id == _therapyPlanId)
                   ? _therapyPlanId
                   : null,
               decoration: const InputDecoration(labelText: 'Therapy plan'),
               items: [
-                const DropdownMenuItem(value: null, child: Text('—')),
-                ..._therapyPlanOptions.map((o) => DropdownMenuItem(value: o.id, child: Text(o.name))),
+                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                ..._therapyPlanOptions.map((o) => DropdownMenuItem<String?>(value: o.id, child: Text(o.name))),
               ],
               onChanged: (v) => setState(() => _therapyPlanId = v),
             ),

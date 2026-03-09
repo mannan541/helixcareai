@@ -16,6 +16,7 @@ export type UserRow = {
   approved_at: string | null;
   deleted_at: string | null;
   disabled_at: string | null;
+  is_active: boolean;
   mobile_number: string | null;
   show_mobile_to_parents: boolean;
 };
@@ -31,7 +32,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 /** Find user by email for login; returns user even if deleted/disabled so we can return the right error. */
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
   return queryOne<UserRow>(
-    `SELECT id, email, password_hash, full_name, role, title, approved_at, deleted_at, disabled_at,
+    `SELECT id, email, password_hash, full_name, role, title, approved_at, deleted_at, disabled_at, is_active,
      COALESCE(mobile_number, NULL) AS mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents
      FROM users WHERE email = $1`,
     [email.toLowerCase().trim()]
@@ -59,6 +60,19 @@ export async function findUserById(id: string): Promise<Omit<UserRow, 'password_
   return user;
 }
 
+/** Find user by id including soft-deleted/disabled (for admin restore). */
+export async function findUserByIdIncludingDeleted(id: string): Promise<Omit<UserRow, 'password_hash'> | null> {
+  const row = await queryOne<UserRow>(
+    `SELECT id, email, password_hash, full_name, role, title, approved_at, deleted_at, disabled_at,
+     mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents
+     FROM users WHERE id = $1`,
+    [id]
+  );
+  if (!row) return null;
+  const { password_hash: _, ...user } = row;
+  return user;
+}
+
 /** Verify that the given password matches the user's stored hash (for profile password change). */
 export async function verifyUserPassword(userId: string, password: string): Promise<boolean> {
   const row = await queryOne<Pick<UserRow, 'password_hash'>>(
@@ -69,7 +83,15 @@ export async function verifyUserPassword(userId: string, password: string): Prom
   return verifyPassword(password, row.password_hash);
 }
 
-export type UserListItem = { id: string; email: string; full_name: string; role: string; title: string | null; approved_at: string | null; disabled_at: string | null; mobile_number: string | null; show_mobile_to_parents: boolean };
+export type UserListItem = { id: string; email: string; full_name: string; role: string; title: string | null; approved_at: string | null; disabled_at: string | null; deleted_at: string | null; mobile_number: string | null; show_mobile_to_parents: boolean };
+
+const SORT_COLUMNS = ['full_name', 'email', 'role', 'approved_at', 'disabled_at', 'deleted_at'] as const;
+type SortColumn = (typeof SORT_COLUMNS)[number];
+function orderClause(sortBy?: string, sortOrder?: string): string {
+  const col = sortBy && SORT_COLUMNS.includes(sortBy as SortColumn) ? sortBy : 'full_name';
+  const dir = sortOrder === 'desc' ? 'DESC' : 'ASC';
+  return `ORDER BY ${col} ${dir} NULLS LAST`;
+}
 
 export async function findUsers(opts: {
   role?: string;
@@ -78,8 +100,10 @@ export async function findUsers(opts: {
   search?: string;
   /** When true, only approved users; when false, only pending (approved_at IS NULL). Omit for all. */
   approved?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }): Promise<{ users: UserListItem[]; total: number }> {
-  const { role, limit, offset, search, approved } = opts;
+  const { role, limit, offset, search, approved, sortBy, sortOrder } = opts;
   const conditions: string[] = [];
   const params: unknown[] = [];
   let i = 1;
@@ -103,8 +127,45 @@ export async function findUsers(opts: {
   const total = parseInt(countRows[0]?.count ?? '0', 10);
   const limitIdx = params.length + 1;
   const offsetIdx = params.length + 2;
-  const users = await query<{ id: string; email: string; full_name: string; role: string; title: string | null; approved_at: string | null; disabled_at: string | null; mobile_number: string | null; show_mobile_to_parents: boolean }>(
-    `SELECT id, email, full_name, role, title, approved_at, disabled_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents FROM users ${where} ORDER BY full_name ASC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+  const users = await query<UserListItem>(
+    `SELECT id, email, full_name, role, title, approved_at, disabled_at, NULL::timestamptz AS deleted_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents FROM users ${where} ${orderClause(sortBy, sortOrder)} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    [...params, limit, offset]
+  );
+  return { users, total };
+}
+
+/** List only archived users (soft-deleted or disabled). */
+export async function findUsersArchived(opts: {
+  role?: string;
+  limit: number;
+  offset: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}): Promise<{ users: UserListItem[]; total: number }> {
+  const { role, limit, offset, search, sortBy, sortOrder } = opts;
+  const conditions: string[] = ['(deleted_at IS NOT NULL OR disabled_at IS NOT NULL)'];
+  const params: unknown[] = [];
+  let i = 1;
+  if (role) {
+    conditions.push(`role = $${i++}`);
+    params.push(role);
+  }
+  if (search && search.trim()) {
+    conditions.push(`(email ILIKE $${i++} OR full_name ILIKE $${i++})`);
+    const term = `%${search.trim()}%`;
+    params.push(term, term);
+  }
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const countRows = await query<{ count: string }>(
+    `SELECT COUNT(*)::text as count FROM users ${where}`,
+    params
+  );
+  const total = parseInt(countRows[0]?.count ?? '0', 10);
+  const limitIdx = params.length + 1;
+  const offsetIdx = params.length + 2;
+  const users = await query<UserListItem>(
+    `SELECT id, email, full_name, role, title, approved_at, disabled_at, deleted_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents FROM users ${where} ${orderClause(sortBy, sortOrder)} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     [...params, limit, offset]
   );
   return { users, total };
@@ -164,6 +225,18 @@ export async function disableUser(id: string): Promise<boolean> {
 export async function enableUser(id: string): Promise<boolean> {
   const result = await query(
     'UPDATE users SET disabled_at = NULL, is_active = true, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL AND disabled_at IS NOT NULL RETURNING id',
+    [id]
+  );
+  return result.length > 0;
+}
+
+/**
+ * Reactivate a user that was previously soft-deleted and/or disabled when they attempt to sign up again.
+ * Clears deleted/disabled flags and marks the account as active. Existing approval status is preserved.
+ */
+export async function reactivateUserForSignup(id: string): Promise<boolean> {
+  const result = await query(
+    'UPDATE users SET deleted_at = NULL, deleted_by = NULL, disabled_at = NULL, is_active = true, updated_at = NOW() WHERE id = $1 RETURNING id',
     [id]
   );
   return result.length > 0;

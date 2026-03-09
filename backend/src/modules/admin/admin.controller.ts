@@ -51,6 +51,31 @@ export async function createUser(req: Request, res: Response): Promise<void> {
   }
   const existing = await authService.findUserByEmail(email);
   if (existing) {
+    // If this email belongs to a user that is not currently active (disabled or soft-deleted), reactivate them instead of failing.
+    if (!existing.is_active || existing.deleted_at || existing.disabled_at) {
+      await authService.reactivateUserForSignup(existing.id);
+      // Ensure the account is approved so they can sign in immediately.
+      if (!existing.approved_at) {
+        await authService.approveUser(existing.id);
+      }
+      if (role === 'parent' && childIds && Array.isArray(childIds) && childIds.length > 0) {
+        await childrenService.assignChildrenToUser(childIds, existing.id);
+      }
+      await auditService
+        .log({
+          action: 'user_reactivated_by_admin',
+          userId: existing.id,
+          adminId: req.user!.userId,
+          details: { email: existing.email, fullName: existing.full_name, role: existing.role },
+        })
+        .catch((err) => console.error('[audit] user_reactivated_by_admin failed:', err));
+
+      res.status(200).json({
+        user: { id: existing.id, email: existing.email, fullName: existing.full_name, role: existing.role, title: existing.title },
+        message: 'Existing account for this email was reactivated. The user can sign in again.',
+      });
+      return;
+    }
     res.status(409).json({ error: 'Email already registered' });
     return;
   }
@@ -142,10 +167,14 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
   const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
   const search = (req.query.q as string)?.trim() || undefined;
   const pending = req.query.pending === 'true' || req.query.pending === '1';
-  const approved = pending ? false : undefined;
+  const archived = req.query.archived === 'true' || req.query.archived === '1';
+  const sortBy = (req.query.sortBy as string)?.trim() || undefined;
+  const sortOrder = req.query.sortOrder === 'desc' ? 'desc' as const : 'asc' as const;
   const toIsoOrString = (v: string | Date | null | undefined): string | null =>
     v == null ? null : (v as unknown) instanceof Date ? (v as Date).toISOString() : String(v);
-  const { users, total } = await authService.findUsers({ role, limit, offset, search, approved });
+  const { users, total } = archived
+    ? await authService.findUsersArchived({ role, limit, offset, search, sortBy, sortOrder })
+    : await authService.findUsers({ role, limit, offset, search, approved: pending ? false : undefined, sortBy, sortOrder });
   res.json({
     users: users.map((u) => ({
       id: u.id,
@@ -155,6 +184,7 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
       title: u.title,
       approvedAt: toIsoOrString(u.approved_at),
       disabledAt: toIsoOrString(u.disabled_at),
+      deletedAt: toIsoOrString(u.deleted_at),
       mobileNumber: u.mobile_number ?? undefined,
       showMobileToParents: u.role === 'therapist' ? u.show_mobile_to_parents : undefined,
     })),
@@ -194,20 +224,41 @@ export async function disableUser(req: Request, res: Response): Promise<void> {
 
 export async function enableUser(req: Request, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const user = await authService.findUserById(id);
+  const user = await authService.findUserByIdIncludingDeleted(id);
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
-  const updated = await authService.enableUser(id);
-  if (!updated) {
-    res.status(400).json({ error: 'User is not disabled or not found' });
+  if (user.deleted_at) {
+    await authService.reactivateUserForSignup(id);
+    await authService.approveUser(id);
+    await auditService
+      .log({
+        action: 'user_reactivated_by_admin',
+        userId: id,
+        adminId: req.user!.userId,
+        details: { email: user.email, fullName: user.full_name, role: user.role },
+      })
+      .catch((err) => console.error('[audit] user_reactivated_by_admin failed:', err));
+    res.json({
+      user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role, title: user.title, disabledAt: null, deletedAt: null },
+      message: 'User reactivated. They can sign in again.',
+    });
     return;
   }
-  res.json({
-    user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role, title: user.title, disabledAt: null },
-    message: 'User re-enabled. They can sign in again.',
-  });
+  if (user.disabled_at) {
+    const updated = await authService.enableUser(id);
+    if (!updated) {
+      res.status(400).json({ error: 'User is not disabled or not found' });
+      return;
+    }
+    res.json({
+      user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role, title: user.title, disabledAt: null },
+      message: 'User re-enabled. They can sign in again.',
+    });
+    return;
+  }
+  res.status(400).json({ error: 'User is not disabled or deleted' });
 }
 
 export async function deleteUser(req: Request, res: Response): Promise<void> {

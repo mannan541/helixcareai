@@ -12,6 +12,8 @@ class UserEntity extends Equatable {
   final DateTime? approvedAt;
   /// When non-null, user is disabled and cannot sign in (admin list/detail only).
   final DateTime? disabledAt;
+  /// When non-null, user is soft-deleted (admin archived list only).
+  final DateTime? deletedAt;
   /// Optional mobile number on profile.
   final String? mobileNumber;
   /// Therapist only: when true, parents can see this therapist's mobile number on sessions.
@@ -26,6 +28,7 @@ class UserEntity extends Equatable {
     this.childIds,
     this.approvedAt,
     this.disabledAt,
+    this.deletedAt,
     this.mobileNumber,
     this.showMobileToParents,
   });
@@ -37,7 +40,9 @@ class UserEntity extends Equatable {
   bool get isApproved => approvedAt != null;
   /// True when disabled (admin list/detail only).
   bool get isDisabled => disabledAt != null;
+  /// True when soft-deleted (admin archived list only).
+  bool get isDeleted => deletedAt != null;
 
   @override
-  List<Object?> get props => [id, email, fullName, role, title, childIds, approvedAt, disabledAt, mobileNumber, showMobileToParents];
+  List<Object?> get props => [id, email, fullName, role, title, childIds, approvedAt, disabledAt, deletedAt, mobileNumber, showMobileToParents];
 }
