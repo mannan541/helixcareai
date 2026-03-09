@@ -10,32 +10,50 @@ import 'session_form_screen.dart';
 import 'session_detail_screen.dart';
 
 class SessionsScreen extends StatelessWidget {
-  const SessionsScreen({super.key});
+  const SessionsScreen({super.key, this.showAppBar = true});
+  final bool showAppBar;
 
   @override
   Widget build(BuildContext context) {
-    final child = ModalRoute.of(context)?.settings.arguments;
-    if (child is! ChildEntity) {
+    final arg = ModalRoute.of(context)?.settings.arguments;
+    if (arg is! ChildEntity) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Sessions')),
-        body: const Center(child: Text('Select a child from the list first.')),
+        appBar: showAppBar ? AppBar(title: const Text('Sessions')) : null,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.event_note, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              const Text('Select a child from the Children list to view sessions.'),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () {
+                },
+                child: const Text('Go to Children'),
+              ),
+            ],
+          ),
+        ),
       );
     }
     return BlocProvider(
-      create: (_) => SessionsBloc(sessionsRepository)..add(SessionsLoadRequested(child.id)),
-      child: _SessionsView(child: child),
+      create: (_) => SessionsBloc(sessionsRepository)..add(SessionsLoadRequested(arg.id)),
+      child: _SessionsView(child: arg, showAppBar: showAppBar),
     );
   }
 }
 
 class _SessionsView extends StatefulWidget {
-  const _SessionsView({required this.child});
+  const _SessionsView({required this.child, required this.showAppBar});
 
   final ChildEntity child;
+  final bool showAppBar;
 
   @override
   State<_SessionsView> createState() => _SessionsViewState();
 }
+
 
 class _SessionsViewState extends State<_SessionsView> {
   bool? _canEdit;
@@ -58,8 +76,9 @@ class _SessionsViewState extends State<_SessionsView> {
   Widget build(BuildContext context) {
     final canEdit = _canEdit ?? true;
     return Scaffold(
-      appBar: AppBar(title: Text('Sessions — ${widget.child.fullName}')),
+      appBar: widget.showAppBar ? AppBar(title: Text('Sessions — ${widget.child.fullName}')) : null,
       body: BlocConsumer<SessionsBloc, SessionsState>(
+
         listener: (context, state) {
           if (state.error != null) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText(state.error!)));

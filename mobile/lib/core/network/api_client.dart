@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../storage/local_storage.dart';
 
 class ApiClient {
   late final Dio _dio;
@@ -8,7 +9,9 @@ class ApiClient {
 
   ApiClient() {
     final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
+
     _dio = Dio(BaseOptions(
+
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 120),
@@ -16,11 +19,13 @@ class ApiClient {
     ));
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
+        _token ??= LocalStorage.getToken();
         if (_token != null) {
           options.headers['Authorization'] = 'Bearer $_token';
         }
         return handler.next(options);
       },
+
       onError: (err, handler) {
         if (err.response?.statusCode == 401) {
           _onUnauthorized?.call();
@@ -36,6 +41,7 @@ class ApiClient {
 
   void setToken(String? token) {
     _token = token;
+    LocalStorage.setToken(token);
   }
 
   static bool _isHtmlResponse(dynamic data) =>

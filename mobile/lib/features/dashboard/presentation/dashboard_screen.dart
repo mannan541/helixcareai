@@ -4,14 +4,17 @@ import '../../auth/domain/user_entity.dart';
 import '../../auth/data/auth_repository.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key, this.initialUser});
+  const DashboardScreen({super.key, this.initialUser, this.showAppBar = true, this.onTabSelected});
 
   /// When provided (e.g. after login/register), dashboard shows immediately without waiting for me().
   final UserEntity? initialUser;
+  final bool showAppBar;
+  final void Function(int index)? onTabSelected;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
+
 
 class _DashboardScreenState extends State<DashboardScreen> {
   UserEntity? _user;
@@ -88,18 +91,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     if (_loading && _user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Dashboard')),
+        appBar: widget.showAppBar ? AppBar(title: const Text('Dashboard')) : null,
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Dashboard')),
+        appBar: widget.showAppBar ? AppBar(title: const Text('Dashboard')) : null,
         body: const Center(child: Text('Not logged in')),
       );
     }
     final user = _user!;
     final roleLabel = user.isAdmin ? 'Admin' : (user.isTherapist ? 'Therapist' : 'Parent');
+    
+    final body = RefreshIndicator(
+      onRefresh: _load,
+      child: _error != null
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SelectableText(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  TextButton(onPressed: _load, child: const Text('Retry')),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildWelcomeSection(user.fullName, roleLabel),
+                  const SizedBox(height: 24),
+                  if (user.isAdmin) _buildAdminCards(),
+                  if (user.isTherapist) _buildTherapistCards(),
+                  if (user.isParent) _buildParentCards(),
+                ],
+              ),
+            ),
+    );
+
+    if (!widget.showAppBar) return body;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
@@ -126,36 +161,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _error != null
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SelectableText(_error!, textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    TextButton(onPressed: _load, child: const Text('Retry')),
-                  ],
-                ),
-              )
-            : SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildWelcomeSection(user.fullName, roleLabel),
-                    const SizedBox(height: 24),
-                    if (user.isAdmin) _buildAdminCards(),
-                    if (user.isTherapist) _buildTherapistCards(),
-                    if (user.isParent) _buildParentCards(),
-                  ],
-                ),
-              ),
-      ),
+      body: body,
     );
   }
+
 
   Widget _buildWelcomeSection(String fullName, String roleLabel) {
     return Card(
@@ -324,12 +333,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navigateTo(BuildContext context, String route, {Object? arguments}) {
+    if (widget.onTabSelected != null) {
+      if (route == '/children') {
+        widget.onTabSelected!(1);
+        return;
+      }
+      if (route == '/users' || route == '/pending_users') {
+        widget.onTabSelected!(2);
+        return;
+      }
+      if (route == '/sessions') {
+        widget.onTabSelected!(2);
+        return;
+      }
+      if (route == '/chat') {
+        widget.onTabSelected!(3);
+        return;
+      }
+    }
     if (arguments != null) {
       Navigator.of(context).pushNamed(route, arguments: arguments);
     } else {
       Navigator.of(context).pushNamed(route);
     }
   }
+
 
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
