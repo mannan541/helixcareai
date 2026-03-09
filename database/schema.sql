@@ -547,3 +547,63 @@ CREATE TRIGGER child_progress_logs_updated_at BEFORE UPDATE ON child_progress_lo
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
 -- Ensure chat_logs.child_id is nullable (production migration)
 DO $$ BEGIN ALTER TABLE chat_logs ALTER COLUMN child_id DROP NOT NULL; EXCEPTION WHEN undefined_column THEN NULL; END $$;
+
+-- ============== APPOINTMENTS ==============
+CREATE TABLE IF NOT EXISTS appointments (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id          UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  therapist_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  appointment_date  DATE NOT NULL,
+  start_time        TIME NOT NULL,
+  end_time          TIME NOT NULL,
+  status            VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'approved', 'completed', 'cancelled')) DEFAULT 'pending',
+  created_by        UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at        TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_appointments_child_id ON appointments(child_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_therapist_id ON appointments(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+
+DROP TRIGGER IF EXISTS appointments_updated_at ON appointments;
+CREATE TRIGGER appointments_updated_at BEFORE UPDATE ON appointments
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- ============== CLINIC SLOTS (Admin-defined available windows) ==============
+-- Each row is a 45-minute slot (or custom window) that is either available or blocked.
+-- slot_type: 'available' means bookable; 'blocked' means a break/unavailable window.
+CREATE TABLE IF NOT EXISTS clinic_slots (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  label       VARCHAR(100)  NOT NULL,           -- e.g. "09:00 AM - 09:45 AM" or "Lunch Break"
+  start_time  TIME NOT NULL,
+  end_time    TIME NOT NULL,
+  slot_type   VARCHAR(20) NOT NULL CHECK (slot_type IN ('available', 'blocked')) DEFAULT 'available',
+  day_of_week SMALLINT[],                       -- NULL = every day; 0=Sun,1=Mon,...,6=Sat
+  is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DROP TRIGGER IF EXISTS clinic_slots_updated_at ON clinic_slots;
+CREATE TRIGGER clinic_slots_updated_at BEFORE UPDATE ON clinic_slots
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- Seed default 45-minute slots (9:00 AM – 3:00 PM) if none exist
+INSERT INTO clinic_slots (label, start_time, end_time, slot_type)
+SELECT label, start_time::TIME, end_time::TIME, 'available'
+FROM (VALUES
+  ('09:00 AM - 09:45 AM', '09:00', '09:45'),
+  ('09:45 AM - 10:30 AM', '09:45', '10:30'),
+  ('10:30 AM - 11:15 AM', '10:30', '11:15'),
+  ('11:15 AM - 12:00 PM', '11:15', '12:00'),
+  ('12:00 PM - 12:45 PM', '12:00', '12:45'),
+  ('12:45 PM - 01:30 PM', '12:45', '13:30'),
+  ('01:30 PM - 02:15 PM', '13:30', '14:15'),
+  ('02:15 PM - 03:00 PM', '14:15', '15:00')
+) AS t(label, start_time, end_time)
+WHERE NOT EXISTS (SELECT 1 FROM clinic_slots LIMIT 1);

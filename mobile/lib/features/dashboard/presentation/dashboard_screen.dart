@@ -261,6 +261,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )),
           ],
         ),
+        const SizedBox(height: 12),
+        _DashboardCard(
+          title: 'Appointment requests',
+          icon: Icons.assignment_late,
+          onTap: () => Navigator.of(context).pushNamed('/admin_appointments'),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _DashboardCard(
+              title: 'Book Appointment',
+              icon: Icons.calendar_today,
+              onTap: () => Navigator.of(context).pushNamed('/admin_book_appointment'),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _DashboardCard(
+              title: 'Manage Slots',
+              icon: Icons.tune,
+              onTap: () => Navigator.of(context).pushNamed('/manage_slots'),
+            )),
+          ],
+        ),
       ],
     );
   }
@@ -284,17 +306,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )),
             const SizedBox(width: 12),
             Expanded(child: _DashboardCard(
-              title: 'Log session',
-              count: sessionsCount,
-              icon: Icons.event_note,
-              onTap: () {
-                _navigateTo(context, '/children');
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Select a child to log a session')),
-                  );
-                }
-              },
+              title: 'My Schedule',
+              icon: Icons.calendar_month,
+              onTap: () => Navigator.of(context).pushNamed('/schedule'),
             )),
           ],
         ),
@@ -321,10 +335,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )),
             const SizedBox(width: 12),
             Expanded(child: _DashboardCard(
-              title: 'Sessions',
-              count: sessionsCount,
-              icon: Icons.event_note,
-              onTap: () => _navigateTo(context, '/children'),
+              title: 'Book Session',
+              icon: Icons.add_task,
+              onTap: () => Navigator.of(context).pushNamed('/book_appointment'),
             )),
           ],
         ),

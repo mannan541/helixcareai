@@ -16,6 +16,12 @@ import 'features/admin/presentation/users_list_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/analytics/presentation/analytics_screen.dart';
 import 'features/notifications/presentation/notifications_screen.dart';
+import 'features/appointments/presentation/appointments_bloc.dart';
+import 'features/appointments/presentation/appointment_booking_screen.dart';
+import 'features/appointments/presentation/therapist_schedule_screen.dart';
+import 'features/appointments/presentation/admin_appointment_screen.dart';
+import 'features/appointments/presentation/admin_slot_management_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
 import 'core/presentation/screens/main_screen.dart';
@@ -112,6 +118,29 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
         '/chat': (_) => const ChatScreen(),
         '/analytics': (_) => const AnalyticsScreen(),
         '/notifications': (_) => const NotificationsScreen(),
+        '/book_appointment': (_) => BlocProvider(
+              create: (_) => AppointmentsBloc(appointmentsRepository),
+              child: const AppointmentBookingScreen(),
+            ),
+        '/admin_book_appointment': (_) => BlocProvider(
+              create: (_) => AppointmentsBloc(appointmentsRepository),
+              child: const AppointmentBookingScreen(adminMode: true),
+            ),
+        '/manage_slots': (_) => const AdminSlotManagementScreen(),
+        '/schedule': (_) => BlocProvider(
+              create: (_) => AppointmentsBloc(appointmentsRepository),
+              child: FutureBuilder<UserEntity?>(
+                future: authRepository.me(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                  return TherapistScheduleScreen(therapistId: snapshot.data!.id);
+                },
+              ),
+            ),
+        '/admin_appointments': (_) => BlocProvider(
+              create: (_) => AppointmentsBloc(appointmentsRepository),
+              child: const AdminAppointmentApprovalScreen(),
+            ),
       },
     );
   }
