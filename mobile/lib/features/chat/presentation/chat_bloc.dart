@@ -16,7 +16,6 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   }
 
   Future<void> _onLoadHistory(ChatLoadHistoryRequested e, Emitter<ChatState> emit) async {
-    if (e.childId.isEmpty) return;
     emit(const ChatState.loading());
     try {
       final messages = await _repo.getHistory(e.childId);
