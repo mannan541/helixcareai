@@ -12,42 +12,22 @@ class ChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = ModalRoute.of(context)?.settings.arguments;
-    if (child is! ChildEntity) {
-      return Scaffold(
-        appBar: showAppBar ? AppBar(title: const Text('Chat')) : null,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.chat_outlined, size: 64, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text('Select a child from the Children list to start a chat.'),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  // If we are in MainScreen, we might want to switch tabs.
-                  // For now, just a hint is fine or we can use a callback.
-                },
-                child: const Text('Go to Children'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final arg = ModalRoute.of(context)?.settings.arguments;
+    final child = arg is ChildEntity ? arg : null;
+
     return BlocProvider(
-      create: (_) => ChatBloc(chatRepository)..add(ChatLoadHistoryRequested(child.id)),
+      create: (_) => ChatBloc(chatRepository)..add(ChatLoadHistoryRequested(child?.id)),
       child: _ChatView(child: child, showAppBar: showAppBar),
     );
   }
 }
 
 class _ChatView extends StatefulWidget {
-  const _ChatView({required this.child, required this.showAppBar});
+  const _ChatView({this.child, required this.showAppBar});
 
-  final ChildEntity child;
+  final ChildEntity? child;
   final bool showAppBar;
+
 
   @override
   State<_ChatView> createState() => _ChatViewState();
@@ -69,7 +49,9 @@ class _ChatViewState extends State<_ChatView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.showAppBar ? AppBar(title: Text('Chat — ${widget.child.fullName}')) : null,
+      appBar: widget.showAppBar
+          ? AppBar(title: Text(widget.child == null ? 'AI Assistant' : 'Chat — ${widget.child!.fullName}'))
+          : null,
       body: BlocConsumer<ChatBloc, ChatState>(
 
         listener: (context, state) {
@@ -90,17 +72,22 @@ class _ChatViewState extends State<_ChatView> {
                 children: [
                   SelectableText(state.error!, textAlign: TextAlign.center),
                   TextButton(
-                    onPressed: () => context.read<ChatBloc>().add(ChatLoadHistoryRequested(widget.child.id)),
+                    onPressed: () => context.read<ChatBloc>().add(ChatLoadHistoryRequested(widget.child?.id)),
                     child: const Text('Retry'),
                   ),
                 ],
               ),
             );
           } else if (state.messages.isEmpty) {
-            listContent = const Center(
+            listContent = Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('Ask anything about this child\'s sessions. Answers are grounded in their session notes.'),
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  widget.child == null
+                      ? 'Ask anything about the clinic, therapists, or all children. I am your global AI assistant.'
+                      : 'Ask anything about this child\'s sessions. Answers are grounded in their session notes.',
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           } else {
@@ -192,7 +179,7 @@ class _ChatViewState extends State<_ChatView> {
                                     icon: const Icon(Icons.refresh, size: 18),
                                     onPressed: state.isSending
                                         ? null
-                                        : () => context.read<ChatBloc>().add(ChatRetryRequested(widget.child.id, state.messages.length - 1 - i)),
+                                        : () => context.read<ChatBloc>().add(ChatRetryRequested(widget.child?.id, state.messages.length - 1 - i)),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     tooltip: 'Try again',
@@ -224,9 +211,9 @@ class _ChatViewState extends State<_ChatView> {
                     Expanded(
                       child: TextField(
                         controller: _controller,
-                        decoration: const InputDecoration(
-                          hintText: 'Ask about this child...',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          hintText: widget.child == null ? 'Ask the AI Assistant...' : 'Ask about this child...',
+                          border: const OutlineInputBorder(),
                         ),
                         maxLines: 1,
                         textInputAction: TextInputAction.send,
@@ -256,6 +243,6 @@ class _ChatViewState extends State<_ChatView> {
     final q = _controller.text.trim();
     if (q.isEmpty) return;
     _controller.clear();
-    context.read<ChatBloc>().add(ChatSendMessageRequested(widget.child.id, q));
+    context.read<ChatBloc>().add(ChatSendMessageRequested(widget.child?.id, q));
   }
 }
