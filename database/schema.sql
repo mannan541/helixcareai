@@ -349,7 +349,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS chat_logs (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  child_id    UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  child_id    UUID REFERENCES children(id) ON DELETE CASCADE,
   role        VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
   content     TEXT NOT NULL,
   created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -545,3 +545,5 @@ CREATE TRIGGER guardians_updated_at BEFORE UPDATE ON guardians
 DROP TRIGGER IF EXISTS child_progress_logs_updated_at ON child_progress_logs;
 CREATE TRIGGER child_progress_logs_updated_at BEFORE UPDATE ON child_progress_logs
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+-- Ensure chat_logs.child_id is nullable (production migration)
+DO $$ BEGIN ALTER TABLE chat_logs ALTER COLUMN child_id DROP NOT NULL; EXCEPTION WHEN undefined_column THEN NULL; END $$;
