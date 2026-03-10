@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../domain/appointment_entity.dart';
 import 'appointments_bloc.dart';
+import 'sessions_bloc.dart';
 import '../../sessions/presentation/session_form_screen.dart';
 import '../../../core/di/injection.dart';
 import '../../children/data/children_repository.dart';
@@ -155,14 +156,17 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
 
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => SessionFormScreen(
-            child: child,
-            onSaved: () {
-              context.read<AppointmentsBloc>().add(AppointmentStatusUpdateRequested(
-                    id: appt.id,
-                    status: 'completed',
-                  ));
-            },
+          builder: (_) => BlocProvider(
+            create: (_) => SessionsBloc(sessionsRepository),
+            child: SessionFormScreen(
+              child: child,
+              onSaved: () {
+                context.read<AppointmentsBloc>().add(AppointmentStatusUpdateRequested(
+                      id: appt.id,
+                      status: 'completed',
+                    ));
+              },
+            ),
           ),
         ),
       );
