@@ -160,6 +160,7 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
             create: (_) => SessionsBloc(sessionsRepository),
             child: SessionFormScreen(
               child: child,
+              selectedAppointment: appt,
               onSaved: () {
                 context.read<AppointmentsBloc>().add(AppointmentStatusUpdateRequested(
                       id: appt.id,

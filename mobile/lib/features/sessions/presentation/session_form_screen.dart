@@ -13,11 +13,13 @@ class SessionFormScreen extends StatefulWidget {
     super.key,
     required this.child,
     this.session,
+    this.selectedAppointment,
     required this.onSaved,
   });
 
   final ChildEntity child;
   final SessionEntity? session;
+  final AppointmentEntity? selectedAppointment;
   final VoidCallback onSaved;
 
   @override
@@ -54,7 +56,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   @override
   void initState() {
     super.initState();
-    _date = widget.session?.sessionDate ?? DateTime.now();
+    _date = widget.session?.sessionDate ?? widget.selectedAppointment?.appointmentDate ?? DateTime.now();
     _durationController.text = widget.session?.durationMinutes?.toString() ?? '45';
     _notesController.text = widget.session?.notesText ?? '';
     final metrics = widget.session?.structuredMetrics ?? {};
@@ -72,6 +74,10 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     } else if (session?.therapistId != null) {
       _therapyTitle = metrics['therapyTitle'] as String?;
       WidgetsBinding.instance.addPostFrameCallback((_) => _resolveTherapistById(session!.therapistId!));
+    } else if (widget.selectedAppointment?.therapistUser != null) {
+      final u = widget.selectedAppointment!.therapistUser!;
+      _selectedTherapist = u;
+      _therapyTitle = _therapyTitleFromTherapistTitle(u.title);
     } else if (session == null && _lastSelectedTherapist != null) {
       _selectedTherapist = _lastSelectedTherapist;
       _therapyTitle = metrics['therapyTitle'] as String? ?? _therapyTitleFromTherapistTitle(_lastSelectedTherapist!.title);
@@ -95,6 +101,10 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         return '$h:${d.minute.toString().padLeft(2, '0')} $ampm';
       }
       autoTimeSlot = '${fmt(slotStart)} - ${fmt(slotEnd)}';
+    }
+    if (widget.selectedAppointment != null) {
+      final appt = widget.selectedAppointment!;
+      autoTimeSlot = '${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}';
     }
     _timeSlotController.text = metrics['timeSlot']?.toString() ?? autoTimeSlot;
     for (final e in metrics.entries) {
