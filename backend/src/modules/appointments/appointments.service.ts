@@ -137,3 +137,47 @@ export async function getBookedSlots(therapistId: string, date: string): Promise
         [therapistId, date]
     );
 }
+
+export async function count(filters: {
+    status?: string | string[];
+    therapistId?: string;
+    childId?: string;
+    parentId?: string;
+} = {}): Promise<number> {
+    const params: unknown[] = [];
+    let sql = `
+    SELECT COUNT(*)::int as count
+    FROM appointments a
+    `;
+
+    if (filters.parentId) {
+        sql += ` JOIN children c ON a.child_id = c.id `;
+    }
+
+    sql += ` WHERE a.deleted_at IS NULL `;
+
+    if (filters.status) {
+        if (Array.isArray(filters.status)) {
+            params.push(filters.status);
+            sql += ` AND a.status = ANY($${params.length})`;
+        } else {
+            params.push(filters.status);
+            sql += ` AND a.status = $${params.length}`;
+        }
+    }
+    if (filters.therapistId) {
+        params.push(filters.therapistId);
+        sql += ` AND a.therapist_id = $${params.length}`;
+    }
+    if (filters.childId) {
+        params.push(filters.childId);
+        sql += ` AND a.child_id = $${params.length}`;
+    }
+    if (filters.parentId) {
+        params.push(filters.parentId);
+        sql += ` AND c.user_id = $${params.length}`;
+    }
+
+    const row = await queryOne<{ count: number }>(sql, params);
+    return row?.count ?? 0;
+}

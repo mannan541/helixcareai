@@ -23,6 +23,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   DashboardCounts? _counts;
   int? _childrenCount; // for therapist/parent
   int? _sessionsCount; // for therapist: my sessions; for parent: children's sessions
+  int? _pendingAppointmentsCount; 
+  int? _totalAppointmentsCount;
   int _notificationUnreadCount = 0;
   bool _loading = true;
   String? _error;
@@ -57,12 +59,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       DashboardCounts? counts;
       int? childrenCount;
       int? sessionsCount;
+      int? pendingAppts;
+      int? totalAppts;
       if (user.isAdmin) {
         counts = await authRepository.getDashboardCounts();
       } else {
         final userCounts = await authRepository.getDashboardCountsForUser();
         childrenCount = userCounts?.children;
         sessionsCount = userCounts?.sessions;
+        pendingAppts = userCounts?.pendingAppointments;
+        totalAppts = userCounts?.totalAppointments;
       }
       final unreadCount = await authRepository.getNotificationUnreadCount();
       if (!mounted) return;
@@ -71,6 +77,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _counts = counts;
         _childrenCount = childrenCount;
         _sessionsCount = sessionsCount;
+        _pendingAppointmentsCount = pendingAppts;
+        _totalAppointmentsCount = totalAppts;
         _notificationUnreadCount = unreadCount;
         _loading = false;
       });
@@ -271,6 +279,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 12),
         _DashboardCard(
           title: 'Appointment requests',
+          count: c?.pendingAppointments,
           icon: Icons.assignment_late,
           onTap: () => Navigator.of(context).pushNamed('/admin_appointments'),
         ),
@@ -279,6 +288,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(child: _DashboardCard(
               title: 'Book Appointment',
+              count: c?.totalAppointments,
               icon: Icons.calendar_today,
               onTap: () => Navigator.of(context).pushNamed('/admin_book_appointment'),
             )),
@@ -344,6 +354,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 12),
             Expanded(child: _DashboardCard(
               title: 'Book Session',
+              count: _totalAppointmentsCount, 
               icon: Icons.add_task,
               onTap: () => Navigator.of(context).pushNamed('/book_appointment'),
             )),
@@ -352,6 +363,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
+            Expanded(child: _DashboardCard(
+              title: 'Appointment Requests',
+              count: _pendingAppointmentsCount,
+              icon: Icons.assignment_late,
+              onTap: () => Navigator.of(context).pushNamed('/parent_schedule'),
+            )),
+            const SizedBox(width: 12),
             Expanded(child: _DashboardCard(
               title: 'My Schedule',
               icon: Icons.calendar_month,
@@ -490,14 +508,16 @@ class _DashboardCard extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${count ?? 0}',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
+              if (count != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '$count',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

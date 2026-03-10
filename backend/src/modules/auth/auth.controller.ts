@@ -5,6 +5,7 @@ import * as childrenService from '../children/children.service';
 import * as sessionsService from '../sessions/sessions.service';
 import * as notificationsEmit from '../notifications/notifications.emit';
 import * as auditService from '../audit/audit.service';
+import * as appointmentsService from '../appointments/appointments.service';
 
 export async function listTherapists(req: Request, res: Response): Promise<void> {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
@@ -210,5 +211,15 @@ export async function getDashboardCounts(req: Request, res: Response): Promise<v
   } else if (role === 'parent') {
     sessions = await sessionsService.countForParentUserId(userId);
   }
-  res.json({ children, sessions });
+
+  // Appointment counts
+  const totalAppointments = await appointmentsService.count(
+    role === 'therapist' ? { therapistId: userId } : { parentId: userId }
+  );
+  const pendingAppointments = await appointmentsService.count({
+    status: 'pending',
+    ...(role === 'therapist' ? { therapistId: userId } : { parentId: userId })
+  });
+
+  res.json({ children, sessions, totalAppointments, pendingAppointments });
 }

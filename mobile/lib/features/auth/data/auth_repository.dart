@@ -86,6 +86,8 @@ class AuthRepository {
         totalUsers: _parseInt(data['totalUsers'] ?? data['total_users']),
         pendingUsers: _parseInt(data['pendingUsers'] ?? data['pending_users']),
         clinicSlots: _parseInt(data['clinicSlots'] ?? data['clinic_slots']),
+        pendingAppointments: _parseInt(data['pendingAppointments'] ?? data['pending_appointments']),
+        totalAppointments: _parseInt(data['totalAppointments'] ?? data['total_appointments']),
       );
     } on DioException catch (e) {
       if (e.response?.statusCode == 403 || e.response?.statusCode == 401) return null;
@@ -101,6 +103,8 @@ class AuthRepository {
       return UserDashboardCounts(
         children: _parseInt(data['children']),
         sessions: _parseInt(data['sessions']),
+        pendingAppointments: _parseInt(data['pendingAppointments'] ?? data['pending_appointments']),
+        totalAppointments: _parseInt(data['totalAppointments'] ?? data['total_appointments']),
       );
     } on DioException catch (e) {
       if (e.response?.statusCode == 401 || e.response?.statusCode == 403) return null;
@@ -419,6 +423,8 @@ class DashboardCounts {
     required this.totalUsers,
     this.pendingUsers = 0,
     this.clinicSlots = 0,
+    this.pendingAppointments = 0,
+    this.totalAppointments = 0,
   });
   final int children;
   final int therapists;
@@ -426,13 +432,22 @@ class DashboardCounts {
   final int totalUsers;
   final int pendingUsers;
   final int clinicSlots;
+  final int pendingAppointments;
+  final int totalAppointments;
 }
 
 /// Dashboard counts for therapist/parent (children + sessions).
 class UserDashboardCounts {
-  UserDashboardCounts({required this.children, required this.sessions});
+  UserDashboardCounts({
+    required this.children,
+    required this.sessions,
+    this.pendingAppointments = 0,
+    this.totalAppointments = 0,
+  });
   final int children;
   final int sessions;
+  final int pendingAppointments;
+  final int totalAppointments;
 }
 
 class UsersListResponse {
