@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../domain/appointment_entity.dart';
 import 'appointments_bloc.dart';
 import '../../sessions/presentation/session_form_screen.dart';
 import '../../../core/di/injection.dart';
 import '../../children/data/children_repository.dart';
+import '../../../core/utils/date_format.dart';
 
 class TherapistScheduleScreen extends StatefulWidget {
   final String therapistId;
@@ -15,19 +17,29 @@ class TherapistScheduleScreen extends StatefulWidget {
 }
 
 class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
-  DateTime _selectedDate = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
 
   @override
   void initState() {
     super.initState();
+    _selectedDay = _focusedDay;
     _loadAppointments();
   }
 
   void _loadAppointments() {
+    // Load ALL appointments for the therapist (no date filter in request 
+    // to allow TableCalendar to show dots for all days)
     context.read<AppointmentsBloc>().add(AppointmentsListRequested(
-          date: _selectedDate.toIso8601String().split('T').first,
           therapistId: widget.therapistId,
         ));
+  }
+
+  List<AppointmentEntity> _getEventsForDay(List<AppointmentEntity> appointments, DateTime day) {
+    return appointments.where((appt) {
+      if (appt.status == AppointmentStatus.cancelled) return false;
+      return isSameDay(appt.appointmentDate, day);
+    }).toList();
   }
 
   @override
@@ -36,52 +48,100 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
       appBar: AppBar(
         title: const Text('My Schedule'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                lastDate: DateTime.now().add(const Duration(days: 90)),
-              );
-              if (picked != null) {
-                setState(() => _selectedDate = picked);
-                _loadAppointments();
-              }
-            },
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadAppointments),
         ],
       ),
       body: BlocBuilder<AppointmentsBloc, AppointmentsState>(
         builder: (context, state) {
-          if (state.isLoading) return const Center(child: CircularProgressIndicator());
-          if (state.error != null) return Center(child: SelectableText('Error: ${state.error}'));
+          if (state.isLoading && state.appointments.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state.error != null) {
+            return Center(child: SelectableText('Error: ${state.error}'));
+          }
 
-          final appointments = state.appointments;
+          final allAppointments = state.appointments;
+          final selectedAppointments = _selectedDay != null
+              ? _getEventsForDay(allAppointments, _selectedDay!)
+              : [];
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: appointments.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final appt = appointments[index];
-              final isCompleted = appt.status == AppointmentStatus.completed;
-
-              return Card(
-                child: ListTile(
-                  title: Text('${appt.startTime} - ${appt.endTime}'),
-                  subtitle: Text('Child: ${appt.childFullName}\nStatus: ${appt.status.toString().split('.').last.toUpperCase()}'),
-                  isThreeLine: true,
-                  trailing: (appt.status == AppointmentStatus.approved)
-                      ? ElevatedButton(
-                          onPressed: () => _navigateToLogSession(appt),
-                          child: const Text('Log Session'),
-                        )
-                      : (isCompleted ? const Icon(Icons.check_circle, color: Colors.green) : null),
+          return Column(
+            children: [
+              TableCalendar<AppointmentEntity>(
+                firstDay: DateTime.now().subtract(const Duration(days: 365)),
+                lastDay: DateTime.now().add(const Duration(days: 365)),
+                focusedDay: _focusedDay,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _selectedDay = selectedDay;
+                    _focusedDay = focusedDay;
+                  });
+                },
+                eventLoader: (day) => _getEventsForDay(allAppointments, day),
+                calendarStyle: const CalendarStyle(
+                  markerDecoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              );
-            },
+                headerStyle: const HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: selectedAppointments.isEmpty
+                    ? const Center(child: Text('No appointments for this date.', style: TextStyle(color: Colors.grey)))
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                        itemCount: selectedAppointments.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final appt = selectedAppointments[index];
+                          final isCompleted = appt.status == AppointmentStatus.completed;
+
+                          Color statusColor = Colors.grey;
+                          if (appt.status == AppointmentStatus.approved) statusColor = Colors.green;
+                          if (appt.status == AppointmentStatus.completed) statusColor = Colors.blue;
+
+                          return Card(
+                            child: ListTile(
+                              title: Text(
+                                '${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text('Child: ${appt.childFullName}'),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Text('Status: '),
+                                      Text(
+                                        appt.status.toString().split('.').last.toUpperCase(),
+                                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                              trailing: (appt.status == AppointmentStatus.approved)
+                                  ? ElevatedButton(
+                                      onPressed: () => _navigateToLogSession(appt),
+                                      child: const Text('Log Session'),
+                                    )
+                                  : (isCompleted ? const Icon(Icons.check_circle, color: Colors.green) : null),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -89,7 +149,6 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
   }
 
   Future<void> _navigateToLogSession(AppointmentEntity appt) async {
-    // Need to fetch full child entity first
     try {
       final child = await childrenRepository.getOne(appt.childId);
       if (!mounted) return;
@@ -99,7 +158,6 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
           builder: (_) => SessionFormScreen(
             child: child,
             onSaved: () {
-              // Update appointment status to completed after logging session
               context.read<AppointmentsBloc>().add(AppointmentStatusUpdateRequested(
                     id: appt.id,
                     status: 'completed',

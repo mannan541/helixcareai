@@ -314,21 +314,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 8),
         Text('Therapist', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _DashboardCard(
-              title: 'Children',
-              count: childrenCount,
-              icon: Icons.child_care,
-              onTap: () => _navigateTo(context, '/children'),
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _DashboardCard(
-              title: 'My Schedule',
-              icon: Icons.calendar_month,
-              onTap: () => Navigator.of(context).pushNamed('/schedule'),
-            )),
-          ],
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _DashboardCard(
+                title: 'Children',
+                count: childrenCount,
+                icon: Icons.child_care,
+                onTap: () => _navigateTo(context, '/children'),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _DashboardCard(
+                title: 'My Schedule',
+                icon: Icons.calendar_month,
+                onTap: () => Navigator.of(context).pushNamed('/schedule'),
+              )),
+            ],
+          ),
         ),
       ],
     );
@@ -343,39 +346,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 8),
         Text('My children', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _DashboardCard(
-              title: 'My Children',
-              count: childrenCount,
-              icon: Icons.child_care,
-              onTap: () => _navigateTo(context, '/children'),
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _DashboardCard(
-              title: 'Book Session',
-              count: _totalAppointmentsCount, 
-              icon: Icons.add_task,
-              onTap: () => Navigator.of(context).pushNamed('/book_appointment'),
-            )),
-          ],
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _DashboardCard(
+                title: 'My Children',
+                count: childrenCount,
+                icon: Icons.child_care,
+                onTap: () => _navigateTo(context, '/children'),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _DashboardCard(
+                title: 'Book Session',
+                count: _totalAppointmentsCount, 
+                icon: Icons.add_task,
+                onTap: () => Navigator.of(context).pushNamed('/book_appointment'),
+              )),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _DashboardCard(
-              title: 'Appointment Requests',
-              count: _pendingAppointmentsCount,
-              icon: Icons.assignment_late,
-              onTap: () => Navigator.of(context).pushNamed('/parent_schedule'),
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _DashboardCard(
-              title: 'My Schedule',
-              icon: Icons.calendar_month,
-              onTap: () => Navigator.of(context).pushNamed('/parent_schedule'),
-            )),
-          ],
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _DashboardCard(
+                title: 'Appointment Requests',
+                count: _pendingAppointmentsCount,
+                icon: Icons.assignment_late,
+                onTap: () => Navigator.of(context).pushNamed('/parent_schedule'),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _DashboardCard(
+                title: 'My Schedule',
+                icon: Icons.calendar_month,
+                onTap: () => Navigator.of(context).pushNamed('/parent_schedule'),
+              )),
+            ],
+          ),
         ),
       ],
     );

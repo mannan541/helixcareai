@@ -8,6 +8,7 @@ import '../data/sessions_repository.dart';
 import '../../children/domain/child_entity.dart';
 import 'sessions_bloc.dart';
 import 'session_form_screen.dart';
+import '../../../core/widgets/linkable_text.dart';
 
 class SessionDetailScreen extends StatefulWidget {
   const SessionDetailScreen({
@@ -264,7 +265,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
             const SizedBox(height: 12),
             const Text('Therapist Notes', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(s.notesText!, style: Theme.of(context).textTheme.bodyMedium),
+            LinkableText(s.notesText!, style: Theme.of(context).textTheme.bodyMedium),
           ],
           if (s.structuredMetrics.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -318,7 +319,7 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(c.comment),
+                      LinkableText(c.comment, style: Theme.of(context).textTheme.bodyMedium),
                       const SizedBox(height: 4),
                       Text(formatAppDateTime(c.createdAt), style: Theme.of(context).textTheme.bodySmall),
                     ],

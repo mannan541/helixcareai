@@ -97,7 +97,7 @@ class _ParentScheduleScreenState extends State<ParentScheduleScreen> {
                 child: selectedAppointments.isEmpty
                     ? const Center(child: Text('No booked slots for this date.', style: TextStyle(color: Colors.grey)))
                     : ListView.separated(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
                         itemCount: selectedAppointments.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {

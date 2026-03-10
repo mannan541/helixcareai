@@ -6,6 +6,7 @@ import '../domain/child_entity.dart';
 import 'children_bloc.dart';
 import 'edit_child_screen.dart';
 import '../../appointments/domain/appointment_entity.dart';
+import '../../../core/widgets/linkable_text.dart';
 
 /// Arguments for the child detail route. Pass [childrenBloc] so Edit can refresh the list.
 class ChildDetailArgs {
@@ -78,10 +79,19 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text('DOB: ${formatAppDateFromString(_child.dateOfBirth) ?? _child.dateOfBirth}', style: const TextStyle(fontWeight: FontWeight.w500)),
                     ),
-                  if (_child.diagnosis != null && _child.diagnosis!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
-                      child: Text('Diagnosis: ${_child.diagnosis}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                      child: LinkableText('Diagnosis: ${_child.diagnosis}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    ),
+                  if (_child.notes != null && _child.notes!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: LinkableText('Notes: ${_child.notes}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                    ),
+                  if (_child.behavioralNotes != null && _child.behavioralNotes!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: LinkableText('Behavioral notes: ${_child.behavioralNotes}', style: const TextStyle(fontWeight: FontWeight.w500)),
                     ),
                   if (_child.referredBy != null && _child.referredBy!.isNotEmpty)
                     Text('Referred by: ${_child.referredBy}', style: const TextStyle(fontWeight: FontWeight.w500)),
