@@ -65,7 +65,7 @@ class _SessionsViewState extends State<_SessionsView> {
     super.initState();
     authRepository.me().then((user) {
       if (mounted) setState(() {
-        _canEdit = user != null && (user.isAdmin || user.isTherapist);
+        _canEdit = user?.isAdmin ?? false; // only admin can edit broadly; therapist check per-session below
         _canDeleteSession = user?.isAdmin ?? false;
         _currentUserId = user?.id;
       });
@@ -217,23 +217,33 @@ class _SessionsViewState extends State<_SessionsView> {
     );
   }
 
-  void _openSessionDetailOrForm(BuildContext context, SessionEntity session, bool canEdit) {
-    final bloc = context.read<SessionsBloc>();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => BlocProvider.value(
-          value: bloc,
-          child: SessionDetailScreen(
-            child: widget.child,
-            session: session,
-            canEdit: canEdit,
-            canAddNotes: true,
-            onSaved: () => bloc.add(SessionsLoadRequested(widget.child.id)),
-            canDeleteSession: _canDeleteSession ?? false,
+  void _openSessionDetailOrForm(BuildContext context, SessionEntity session, bool showEditAction) {
+    authRepository.me().then((user) {
+      if (!context.mounted) return;
+      final isAdmin = user?.isAdmin ?? false;
+      final isTherapist = user?.isTherapist ?? false;
+      final isOwner = _currentUserId != null && session.therapistId == _currentUserId;
+
+      final canEdit = isAdmin || (isTherapist && isOwner);
+      final canAddNotes = isAdmin || !isOwner; // Therapist cannot comment on own session, others and parents can.
+
+      final bloc = context.read<SessionsBloc>();
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => BlocProvider.value(
+            value: bloc,
+            child: SessionDetailScreen(
+              child: widget.child,
+              session: session,
+              canEdit: canEdit,
+              canAddNotes: canAddNotes,
+              onSaved: () => bloc.add(SessionsLoadRequested(widget.child.id)),
+              canDeleteSession: isAdmin,
+            ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   void _openSessionForm(BuildContext context, SessionEntity? session) {

@@ -24,6 +24,7 @@ class _SessionDetailRouteScreenState extends State<SessionDetailRouteScreen> {
   ChildEntity? _child;
   SessionEntity? _session;
   bool? _canEdit;
+  bool? _canAddNotes;
   bool? _canDeleteSession;
   bool _loading = true;
   String? _error;
@@ -44,11 +45,16 @@ class _SessionDetailRouteScreenState extends State<SessionDetailRouteScreen> {
       final child = await childrenRepository.getOne(widget.childId);
       final session = await sessionsRepository.getOne(widget.sessionId);
       if (!mounted) return;
+      final isAdmin = user?.isAdmin ?? false;
+      final isTherapist = user?.isTherapist ?? false;
+      final isOwner = user != null && session.therapistId == user.id;
+
       setState(() {
         _child = child;
         _session = session;
-        _canEdit = user != null && (user.isAdmin || user.isTherapist);
-        _canDeleteSession = user?.isAdmin ?? false;
+        _canEdit = isAdmin || (isTherapist && isOwner);
+        _canAddNotes = isAdmin || !isOwner;
+        _canDeleteSession = isAdmin;
         _loading = false;
       });
     } catch (e) {
@@ -92,8 +98,8 @@ class _SessionDetailRouteScreenState extends State<SessionDetailRouteScreen> {
       child: SessionDetailScreen(
         child: child,
         session: session,
-        canEdit: canEdit,
-        canAddNotes: true,
+        canEdit: _canEdit ?? false,
+        canAddNotes: _canAddNotes ?? true,
         onSaved: () {},
         canDeleteSession: _canDeleteSession ?? false,
       ),

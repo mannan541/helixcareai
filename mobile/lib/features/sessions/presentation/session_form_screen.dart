@@ -7,6 +7,7 @@ import '../../admin/presentation/add_user_screen.dart';
 import '../../auth/domain/user_entity.dart';
 import '../domain/session_entity.dart';
 import '../../children/domain/child_entity.dart';
+import '../../appointments/domain/appointment_entity.dart';
 
 class SessionFormScreen extends StatefulWidget {
   const SessionFormScreen({
