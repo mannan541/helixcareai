@@ -3,11 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../domain/appointment_entity.dart';
 import 'appointments_bloc.dart';
-import '../../sessions/presentation/sessions_bloc.dart';
-import '../../sessions/presentation/session_form_screen.dart';
-import '../../../core/di/injection.dart';
-import '../../children/data/children_repository.dart';
-import '../../../core/utils/date_format.dart';
+import 'package:helixcareai_mobile/features/sessions/presentation/sessions_bloc.dart';
+import 'package:helixcareai_mobile/features/sessions/presentation/session_form_screen.dart';
+import 'package:helixcareai_mobile/core/di/injection.dart';
+import 'package:helixcareai_mobile/features/children/data/children_repository.dart';
+import 'package:helixcareai_mobile/core/utils/date_format.dart';
 
 class TherapistScheduleScreen extends StatefulWidget {
   final String therapistId;
