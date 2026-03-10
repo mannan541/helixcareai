@@ -192,7 +192,7 @@ class _SessionsViewState extends State<_SessionsView> {
                         ],
                       ),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _openSessionDetailOrForm(context, s, canEdit),
+                      onTap: () => _openSessionDetailOrForm(context, s),
                     ),
                   );
                 },
@@ -217,7 +217,7 @@ class _SessionsViewState extends State<_SessionsView> {
     );
   }
 
-  void _openSessionDetailOrForm(BuildContext context, SessionEntity session, bool showEditAction) {
+  void _openSessionDetailOrForm(BuildContext context, SessionEntity session) {
     authRepository.me().then((user) {
       if (!context.mounted) return;
       final isAdmin = user?.isAdmin ?? false;

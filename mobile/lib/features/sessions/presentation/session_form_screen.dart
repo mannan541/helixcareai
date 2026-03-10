@@ -77,7 +77,13 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _resolveTherapistById(session!.therapistId!));
     } else if (widget.selectedAppointment?.therapistUser != null) {
       final u = widget.selectedAppointment!.therapistUser!;
-      _selectedTherapist = u;
+      _selectedTherapist = UserEntity(
+        id: u.id,
+        email: u.email,
+        fullName: u.fullName,
+        role: 'therapist',
+        title: u.title,
+      );
       _therapyTitle = _therapyTitleFromTherapistTitle(u.title);
     } else if (session == null && _lastSelectedTherapist != null) {
       _selectedTherapist = _lastSelectedTherapist;
@@ -192,6 +198,16 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const Text('Child', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(
+              widget.child.fullName,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
             if (widget.session != null) ...[
               const Text('Created by', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
