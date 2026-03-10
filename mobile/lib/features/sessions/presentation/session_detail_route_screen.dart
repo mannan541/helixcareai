@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/di/injection.dart';
-import '../../children/domain/child_entity.dart';
-import '../domain/session_entity.dart';
-import '../data/sessions_repository.dart';
-import 'sessions_bloc.dart';
-import 'session_detail_screen.dart';
-import 'session_form_screen.dart';
+import 'package:helixcareai_mobile/core/di/injection.dart';
+import 'package:helixcareai_mobile/features/children/domain/child_entity.dart';
+import 'package:helixcareai_mobile/features/sessions/domain/session_entity.dart';
+import 'package:helixcareai_mobile/features/sessions/data/sessions_repository.dart';
+import 'package:helixcareai_mobile/features/sessions/presentation/sessions_bloc.dart';
+import 'package:helixcareai_mobile/features/sessions/presentation/session_detail_screen.dart';
+import 'package:helixcareai_mobile/features/sessions/presentation/session_form_screen.dart';
 
 /// Loads session and child by id, then shows [SessionDetailScreen].
 /// Used when opening from a notification (deep link).

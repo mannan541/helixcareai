@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'sessions_bloc.dart';
-import '../../../../core/di/injection.dart';
-import '../../../../core/utils/date_format.dart';
-import '../../admin/presentation/add_user_screen.dart';
-import '../../auth/domain/user_entity.dart';
-import '../domain/session_entity.dart';
-import '../../children/domain/child_entity.dart';
-import '../../appointments/domain/appointment_entity.dart';
+import 'package:helixcareai_mobile/features/sessions/presentation/sessions_bloc.dart';
+import 'package:helixcareai_mobile/core/di/injection.dart';
+import 'package:helixcareai_mobile/core/utils/date_format.dart';
+import 'package:helixcareai_mobile/features/admin/presentation/add_user_screen.dart';
+import 'package:helixcareai_mobile/features/auth/domain/user_entity.dart';
+import 'package:helixcareai_mobile/features/sessions/domain/session_entity.dart';
+import 'package:helixcareai_mobile/features/children/domain/child_entity.dart';
+import 'package:helixcareai_mobile/features/appointments/domain/appointment_entity.dart';
 
 class SessionFormScreen extends StatefulWidget {
   const SessionFormScreen({
