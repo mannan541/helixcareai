@@ -115,6 +115,17 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       _metricControllers['focus'] = TextEditingController(text: '5');
       _metricControllers['communication'] = TextEditingController(text: '5');
     }
+    if (_selectedTherapist == null) {
+      authRepository.me().then((me) {
+        if (me != null && (me.role == 'therapist' || me.isTherapist) && mounted && _selectedTherapist == null) {
+          setState(() {
+            _selectedTherapist = me;
+            if (_therapyTitle == null) _therapyTitle = _therapyTitleFromTherapistTitle(me.title);
+          });
+        }
+      });
+    }
+
     _loadChildTherapists();
   }
 
