@@ -9,6 +9,11 @@ String formatAppDate(DateTime dt) {
   return DateFormat('d MMM yyyy', _locale).format(dt);
 }
 
+/// YYYY-MM-DD formatted correctly to avoid timezone shift in APIs
+String formatAppDateOnlyForApi(DateTime dt) {
+  return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+}
+
 /// Date and time: "4 Mar 2025, 2:30 PM"
 String formatAppDateTime(DateTime dt) {
   return DateFormat('d MMM yyyy, h:mm a', _locale).format(dt);
@@ -17,6 +22,18 @@ String formatAppDateTime(DateTime dt) {
 /// Time only: "2:30 PM"
 String formatAppTime(DateTime dt) {
   return DateFormat('h:mm a', _locale).format(dt);
+}
+
+/// Parses time string "HH:mm:ss" or "HH:mm" to "h:mm a"
+String formatAppTimeString(String timeStr) {
+  if (timeStr.trim().isEmpty) return timeStr;
+  try {
+    final parts = timeStr.trim().split(':');
+    final dt = DateTime(2000, 1, 1, int.parse(parts[0]), int.parse(parts[1]));
+    return formatAppTime(dt);
+  } catch (_) {
+    return timeStr;
+  }
 }
 
 /// Long date (month name): "4 March 2025"

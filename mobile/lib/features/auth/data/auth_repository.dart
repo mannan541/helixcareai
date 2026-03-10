@@ -85,6 +85,7 @@ class AuthRepository {
         parents: _parseInt(data['parents']),
         totalUsers: _parseInt(data['totalUsers'] ?? data['total_users']),
         pendingUsers: _parseInt(data['pendingUsers'] ?? data['pending_users']),
+        clinicSlots: _parseInt(data['clinicSlots'] ?? data['clinic_slots']),
       );
     } on DioException catch (e) {
       if (e.response?.statusCode == 403 || e.response?.statusCode == 401) return null;
@@ -417,12 +418,14 @@ class DashboardCounts {
     required this.parents,
     required this.totalUsers,
     this.pendingUsers = 0,
+    this.clinicSlots = 0,
   });
   final int children;
   final int therapists;
   final int parents;
   final int totalUsers;
   final int pendingUsers;
+  final int clinicSlots;
 }
 
 /// Dashboard counts for therapist/parent (children + sessions).

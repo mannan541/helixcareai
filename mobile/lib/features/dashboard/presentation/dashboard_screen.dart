@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/injection.dart';
 import '../../auth/domain/user_entity.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../appointments/domain/appointment_entity.dart';
+import '../../../../core/utils/date_format.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.initialUser, this.showAppBar = true, this.onTabSelected});
@@ -128,6 +130,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   if (user.isAdmin) _buildAdminCards(),
                   if (user.isTherapist) _buildTherapistCards(),
                   if (user.isParent) _buildParentCards(),
+                  if (!user.isAdmin) ...[
+                    const SizedBox(height: 24),
+                    _buildAppointmentsSection(),
+                  ],
                 ],
               ),
             ),
@@ -207,6 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final parents = c?.parents ?? 0;
     final totalUsers = c?.totalUsers ?? 0;
     final pendingUsers = c?.pendingUsers ?? 0;
+    final clinicSlots = c?.clinicSlots ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -261,6 +268,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )),
           ],
         ),
+        const SizedBox(height: 12),
+        _DashboardCard(
+          title: 'Appointment requests',
+          icon: Icons.assignment_late,
+          onTap: () => Navigator.of(context).pushNamed('/admin_appointments'),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _DashboardCard(
+              title: 'Book Appointment',
+              icon: Icons.calendar_today,
+              onTap: () => Navigator.of(context).pushNamed('/admin_book_appointment'),
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _DashboardCard(
+              title: 'Manage Slots',
+              count: clinicSlots,
+              icon: Icons.tune,
+              onTap: () => Navigator.of(context).pushNamed('/manage_slots'),
+            )),
+          ],
+        ),
       ],
     );
   }
@@ -284,17 +314,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )),
             const SizedBox(width: 12),
             Expanded(child: _DashboardCard(
-              title: 'Log session',
-              count: sessionsCount,
-              icon: Icons.event_note,
-              onTap: () {
-                _navigateTo(context, '/children');
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Select a child to log a session')),
-                  );
-                }
-              },
+              title: 'My Schedule',
+              icon: Icons.calendar_month,
+              onTap: () => Navigator.of(context).pushNamed('/schedule'),
             )),
           ],
         ),
@@ -321,12 +343,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )),
             const SizedBox(width: 12),
             Expanded(child: _DashboardCard(
-              title: 'Sessions',
-              count: sessionsCount,
-              icon: Icons.event_note,
-              onTap: () => _navigateTo(context, '/children'),
+              title: 'Book Session',
+              icon: Icons.add_task,
+              onTap: () => Navigator.of(context).pushNamed('/book_appointment'),
             )),
           ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _DashboardCard(
+              title: 'My Schedule',
+              icon: Icons.calendar_month,
+              onTap: () => Navigator.of(context).pushNamed('/parent_schedule'),
+            )),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppointmentsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Upcoming Appointments', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        FutureBuilder<List<AppointmentEntity>>(
+          future: appointmentsRepository.listAppointments(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Text('Error loading appointments: ${snapshot.error}');
+            }
+            final list = snapshot.data ?? [];
+            final upcoming = list.where((a) {
+              final isFuture = a.appointmentDate.isAfter(DateTime.now().subtract(const Duration(days: 1)));
+              final isRelevantStatus = a.status == AppointmentStatus.approved || a.status == AppointmentStatus.pending;
+              return isFuture && isRelevantStatus;
+            }).take(5).toList();
+
+            if (upcoming.isEmpty) {
+              return const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('No upcoming appointments', style: TextStyle(color: Colors.grey)),
+                ),
+              );
+            }
+
+            return Column(
+              children: upcoming.map((appt) {
+                final statusText = appt.status.toString().split('.').last.toUpperCase();
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.event, color: Colors.blue),
+                    title: Text('${formatAppDate(appt.appointmentDate)} (${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)})'),
+                    subtitle: Text('Child: ${appt.childFullName} \nTherapist: ${appt.therapistUser?.fullName} • $statusText'),
+                    isThreeLine: true,
+                  ),
+                );
+              }).toList(),
+            );
+          },
         ),
       ],
     );

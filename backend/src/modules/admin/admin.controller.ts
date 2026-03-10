@@ -14,6 +14,7 @@ export async function getDashboardCounts(req: Request, res: Response): Promise<v
     admins: string;
     total_users: string;
     pending_users: string;
+    clinic_slots: string;
   }>(
     `SELECT
       (SELECT COUNT(*)::text FROM children WHERE deleted_at IS NULL) AS children,
@@ -21,10 +22,11 @@ export async function getDashboardCounts(req: Request, res: Response): Promise<v
       (SELECT COUNT(*)::text FROM users WHERE role = 'parent' AND deleted_at IS NULL) AS parents,
       (SELECT COUNT(*)::text FROM users WHERE role = 'admin' AND deleted_at IS NULL) AS admins,
       (SELECT COUNT(*)::text FROM users WHERE deleted_at IS NULL) AS total_users,
-      (SELECT COUNT(*)::text FROM users WHERE deleted_at IS NULL AND approved_at IS NULL) AS pending_users`
+      (SELECT COUNT(*)::text FROM users WHERE deleted_at IS NULL AND approved_at IS NULL) AS pending_users,
+      (SELECT COUNT(*)::text FROM clinic_slots) AS clinic_slots`
   );
   if (!row) {
-    res.json({ children: 0, therapists: 0, parents: 0, admins: 0, totalUsers: 0, pendingUsers: 0 });
+    res.json({ children: 0, therapists: 0, parents: 0, admins: 0, totalUsers: 0, pendingUsers: 0, clinicSlots: 0 });
     return;
   }
   res.json({
@@ -34,6 +36,7 @@ export async function getDashboardCounts(req: Request, res: Response): Promise<v
     admins: parseInt(row.admins, 10) || 0,
     totalUsers: parseInt(row.total_users, 10) || 0,
     pendingUsers: parseInt(row.pending_users, 10) || 0,
+    clinicSlots: parseInt(row.clinic_slots, 10) || 0,
   });
 }
 

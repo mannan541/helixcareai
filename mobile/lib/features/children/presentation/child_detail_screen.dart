@@ -5,6 +5,7 @@ import '../../../../core/utils/date_format.dart';
 import '../domain/child_entity.dart';
 import 'children_bloc.dart';
 import 'edit_child_screen.dart';
+import '../../appointments/domain/appointment_entity.dart';
 
 /// Arguments for the child detail route. Pass [childrenBloc] so Edit can refresh the list.
 class ChildDetailArgs {
@@ -117,6 +118,48 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).pushNamed('/chat', arguments: _child),
             ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Booked Appointments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 8),
+          FutureBuilder<List<AppointmentEntity>>(
+            future: appointmentsRepository.listAppointments(childId: _child.id),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              }
+              var appts = snapshot.data ?? [];
+              appts = appts.where((a) => a.status != AppointmentStatus.cancelled).toList();
+
+              if (appts.isEmpty) {
+                return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No appointments booked')));
+              }
+              return Column(
+                children: appts.map((appt) {
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.event),
+                      title: Text('${formatAppDate(appt.appointmentDate)} (${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)})'),
+                      subtitle: Text('Therapist: ${appt.therapistUser?.fullName} - Status: ${appt.status.toString().split('.').last.toUpperCase()}'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.edit_calendar, color: Colors.blue),
+                        tooltip: 'Reschedule',
+                        onPressed: () {
+                          // Allow parent to request a reschedule via the normal booking flow
+                          Navigator.of(context).pushNamed('/book_appointment', arguments: appt).then((_) {
+                            // refresh appointments list
+                            setState(() {});
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
         ],
       ),
