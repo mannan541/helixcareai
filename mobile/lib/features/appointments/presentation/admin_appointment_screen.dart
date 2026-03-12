@@ -189,9 +189,9 @@ class _AdminAppointmentApprovalScreenState extends State<AdminAppointmentApprova
                                         if (appt.status == AppointmentStatus.approved) ...[
                                           const SizedBox(width: 8),
                                           ElevatedButton(
-                                            onPressed: () => _navigateToLogSession(appt),
-                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                                            child: Text(appt.sessionId != null ? 'Edit Session' : 'Log Session'),
+                                          onPressed: () => appt.sessionId != null ? _viewSession(appt) : _navigateToLogSession(appt),
+                                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                                          child: Text(appt.sessionId != null ? 'View/Edit Session' : 'Log Session'),
                                           ),
                                         ],
                                         if (appt.status == AppointmentStatus.completed && appt.sessionId != null) ...[

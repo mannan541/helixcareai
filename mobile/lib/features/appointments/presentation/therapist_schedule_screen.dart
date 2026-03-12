@@ -147,8 +147,9 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
                               isThreeLine: true,
                               trailing: (appt.status == AppointmentStatus.approved)
                                   ? ElevatedButton(
-                                      onPressed: () => _navigateToLogSession(appt),
-                                      child: Text(appt.sessionId != null ? 'Edit Session' : 'Log Session'),
+                                      onPressed: () => appt.sessionId != null ? _viewSession(appt) : _navigateToLogSession(appt),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                                      child: Text(appt.sessionId != null ? 'View/Edit Session' : 'Log Session'),
                                     )
                                   : (isCompleted && appt.sessionId != null
                                       ? OutlinedButton(
