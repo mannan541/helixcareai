@@ -11,6 +11,7 @@ import '../../children/data/children_repository.dart';
 import '../../sessions/data/sessions_repository.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../sessions/presentation/session_detail_screen.dart';
+import '../../sessions/domain/session_entity.dart';
 
 class AdminAppointmentApprovalScreen extends StatefulWidget {
   const AdminAppointmentApprovalScreen({super.key});
