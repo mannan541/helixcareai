@@ -247,14 +247,20 @@ class _AdminAppointmentApprovalScreenState extends State<AdminAppointmentApprova
   Future<void> _navigateToLogSession(AppointmentEntity appt) async {
     try {
       final child = await childrenRepository.getOne(appt.childId);
-      if (!mounted) return;
+      
+      SessionEntity? existingSession;
+      if (appt.sessionId != null) {
+        existingSession = await sessionsRepository.getOne(appt.sessionId!);
+      }
 
+      if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => BlocProvider(
             create: (_) => SessionsBloc(sessionsRepository),
             child: SessionFormScreen(
               child: child,
+              session: existingSession,
               selectedAppointment: appt,
               onSaved: () {
                 context.read<AppointmentsBloc>().add(AppointmentStatusUpdateRequested(
@@ -268,7 +274,7 @@ class _AdminAppointmentApprovalScreenState extends State<AdminAppointmentApprova
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText('Failed to load child info: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText('Failed to load info: $e')));
       }
     }
   }
