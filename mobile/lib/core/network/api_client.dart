@@ -28,7 +28,12 @@ class ApiClient {
 
       onError: (err, handler) {
         if (err.response?.statusCode == 401) {
-          _onUnauthorized?.call();
+          // Do not trigger global logout if the 401 comes from login/register endpoints.
+          // This prevents the login screen from reloading (and clearing fields) on bad credentials.
+          final path = err.requestOptions.path;
+          if (!path.contains('/api/auth/login') && !path.contains('/api/auth/register')) {
+            _onUnauthorized?.call();
+          }
         }
         return handler.next(err);
       },

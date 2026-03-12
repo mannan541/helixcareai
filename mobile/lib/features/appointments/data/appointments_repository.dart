@@ -139,4 +139,8 @@ class AppointmentsRepository {
   Future<void> deleteClinicSlot(String id) async {
     await apiClient.delete('/api/appointments/clinic-slots/$id');
   }
+
+  Future<void> deleteAppointment(String id) async {
+    await apiClient.delete('/api/appointments/$id');
+  }
 }

@@ -4,6 +4,12 @@ import 'package:table_calendar/table_calendar.dart';
 import '../domain/appointment_entity.dart';
 import 'appointments_bloc.dart';
 import '../../../core/utils/date_format.dart';
+import '../../sessions/presentation/sessions_bloc.dart';
+import '../../sessions/presentation/session_detail_screen.dart';
+import '../../sessions/data/sessions_repository.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../../core/di/injection.dart';
+import '../../children/data/children_repository.dart';
 
 class ParentScheduleScreen extends StatefulWidget {
   const ParentScheduleScreen({super.key});
@@ -19,7 +25,9 @@ class _ParentScheduleScreenState extends State<ParentScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDay = _focusedDay;
+    final now = DateTime.now();
+    _selectedDay = DateTime(now.year, now.month, now.day);
+    _focusedDay = _selectedDay!;
     _loadAppointments();
   }
 
@@ -70,8 +78,8 @@ class _ParentScheduleScreenState extends State<ParentScheduleScreen> {
           return Column(
             children: [
               TableCalendar<AppointmentEntity>(
-                firstDay: DateTime.now().subtract(const Duration(days: 365)),
-                lastDay: DateTime.now().add(const Duration(days: 365)),
+                firstDay: DateTime(2020, 10, 16),
+                lastDay: DateTime(2030, 3, 14),
                 focusedDay: _focusedDay,
                 selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                 onDaySelected: (selectedDay, focusedDay) {
@@ -102,53 +110,84 @@ class _ParentScheduleScreenState extends State<ParentScheduleScreen> {
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final appt = selectedAppointments[index];
-                          
+
                           Color statusColor = Colors.grey;
-                          if (appt.status == AppointmentStatus.approved) statusColor = Colors.green;
-                          if (appt.status == AppointmentStatus.completed) statusColor = Colors.blue;
+                          if (appt.status == AppointmentStatus.approved)
+                            statusColor = Colors.green;
+                          if (appt.status == AppointmentStatus.completed)
+                            statusColor = Colors.blue;
 
                           return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Time: ${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                      ),
-                                      Chip(
-                                        label: Text(
-                                          appt.status.toString().split('.').last.toUpperCase(),
-                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: appt.sessionId != null
+                                  ? () => _viewSession(appt)
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${formatAppDate(appt.appointmentDate)}  •  ${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16),
                                         ),
-                                        backgroundColor: statusColor,
-                                        visualDensity: VisualDensity.compact,
+                                        Chip(
+                                          label: Text(
+                                            appt.status
+                                                .toString()
+                                                .split('.')
+                                                .last
+                                                .toUpperCase(),
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          backgroundColor: statusColor,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text('Child: ${appt.childFullName}'),
+                                    Text(
+                                        'Therapist: ${appt.therapistUser?.fullName ?? "Unassigned"}'),
+                                    if (appt.sessionId != null) ...[
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Logged (Click to view)',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.blue,
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text('Child: ${appt.childFullName}'),
-                                  Text('Therapist: ${appt.therapistUser?.fullName ?? "Unassigned"}'),
-                                  
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      OutlinedButton(
-                                        onPressed: () {
-                                          Navigator.of(context).pushNamed('/book_appointment', arguments: appt).then((_) {
-                                            _loadAppointments();
-                                          });
-                                        },
-                                        child: const Text('Request Reschedule'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        OutlinedButton(
+                                          onPressed: () {
+                                            Navigator.of(context)
+                                                .pushNamed('/book_appointment',
+                                                    arguments: appt)
+                                                .then((_) {
+                                              _loadAppointments();
+                                            });
+                                          },
+                                          child: const Text('Request Reschedule'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -160,5 +199,35 @@ class _ParentScheduleScreenState extends State<ParentScheduleScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _viewSession(AppointmentEntity appt) async {
+    if (appt.sessionId == null) return;
+    try {
+      final child = await childrenRepository.getOne(appt.childId);
+      final session = await sessionsRepository.getOne(appt.sessionId!);
+      final me = await authRepository.me();
+      if (!mounted) return;
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => SessionsBloc(sessionsRepository),
+            child: SessionDetailScreen(
+              child: child,
+              session: session,
+              onSaved: _loadAppointments,
+              canEdit: me?.role == 'admin' || me?.id == session.therapistId,
+              canAddNotes: true,
+              canDeleteSession: me?.role == 'admin',
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText('Failed to load session: $e')));
+      }
+    }
   }
 }

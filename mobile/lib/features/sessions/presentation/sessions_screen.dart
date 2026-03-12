@@ -191,7 +191,17 @@ class _SessionsViewState extends State<_SessionsView> {
                             ),
                         ],
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_canDeleteSession ?? false)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _confirmDeleteSession(context, s),
+                            ),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
                       onTap: () => _openSessionDetailOrForm(context, s),
                     ),
                   );
@@ -244,6 +254,27 @@ class _SessionsViewState extends State<_SessionsView> {
         ),
       );
     });
+  }
+
+  Future<void> _confirmDeleteSession(BuildContext context, SessionEntity session) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete session?'),
+        content: const Text('This session will be permanently deleted. You cannot undo this.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    context.read<SessionsBloc>().add(SessionDeleteRequested(session.id));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Delete request sent')));
   }
 
   void _openSessionForm(BuildContext context, SessionEntity? session) {

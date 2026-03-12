@@ -1,5 +1,6 @@
 import '../domain/appointment_entity.dart';
 import '../../sessions/domain/session_entity.dart';
+import '../../../core/utils/date_format.dart';
 
 class AppointmentModel extends AppointmentEntity {
   const AppointmentModel({
@@ -17,9 +18,14 @@ class AppointmentModel extends AppointmentEntity {
     super.approvedBy,
     required super.createdAt,
     required super.updatedAt,
+    super.sessionId,
+    super.sessionLoggedByName,
   });
 
   factory AppointmentModel.fromJson(Map<String, dynamic> json) {
+    if (json['id'] == null) {
+      throw ArgumentError('Appointment JSON missing "id" field: $json');
+    }
     return AppointmentModel(
       id: json['id'],
       childId: json['child_id'],
@@ -31,9 +37,10 @@ class AppointmentModel extends AppointmentEntity {
               id: json['therapist_id'],
               fullName: json['_therapist_full_name'],
               email: json['_therapist_email'] ?? '',
+              title: json['_therapist_title'],
             )
           : null,
-      appointmentDate: _parseDateStrictly(json['appointment_date']),
+      appointmentDate: parseAppDateStrictly(json['appointment_date']),
       startTime: json['start_time'],
       endTime: json['end_time'],
       status: AppointmentStatus.values.byName(json['status']),
@@ -41,19 +48,8 @@ class AppointmentModel extends AppointmentEntity {
       approvedBy: json['approved_by'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
+      sessionId: json['session_id'],
+      sessionLoggedByName: json['session_logged_by_name'],
     );
-  }
-
-  /// Parses date strictly into local YYYY-MM-DD, ignoring timezone (e.g., Z) which can cause day shifts.
-  static DateTime _parseDateStrictly(dynamic dateVal) {
-    if (dateVal == null) return DateTime.now();
-    final str = dateVal.toString();
-    if (str.length >= 10) {
-      final ymd = str.substring(0, 10).split('-');
-      if (ymd.length == 3) {
-        return DateTime(int.parse(ymd[0]), int.parse(ymd[1]), int.parse(ymd[2]));
-      }
-    }
-    return DateTime.parse(str);
   }
 }

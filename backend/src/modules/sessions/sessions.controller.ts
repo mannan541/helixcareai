@@ -17,6 +17,7 @@ function toSessionDto(s: sessionsService.SessionRow) {
     createdAt: s.created_at,
     updatedAt: s.updated_at,
     updatedBy: s.updated_by ?? undefined,
+    appointmentId: s.appointment_id ?? undefined,
   };
 }
 
@@ -30,12 +31,12 @@ function toSessionDtoWithUser(s: sessionsService.SessionWithUserRow, requesterRo
   const therapistUser =
     s._th_id != null
       ? {
-          id: s._th_id,
-          fullName: s._th_full_name ?? '',
-          email: s._th_email ?? '',
-          title: s._th_title ?? null,
-          mobileNumber: showTherapistMobile && s._th_mobile_number ? s._th_mobile_number : undefined,
-        }
+        id: s._th_id,
+        fullName: s._th_full_name ?? '',
+        email: s._th_email ?? '',
+        title: s._th_title ?? null,
+        mobileNumber: showTherapistMobile && s._th_mobile_number ? s._th_mobile_number : undefined,
+      }
       : undefined;
   const updatedByUser =
     s._ub_id != null
@@ -77,20 +78,25 @@ export async function getOne(req: Request, res: Response): Promise<void> {
 }
 
 export async function create(req: Request, res: Response): Promise<void> {
+  console.log('[sessionsController.create] start', { userId: req.user?.userId, role: req.user?.role, body: req.body });
   if (req.user!.role === 'parent') {
+    console.warn('[sessionsController.create] parent role not allowed');
     res.status(403).json({ error: 'Only admin or therapist can create a session' });
     return;
   }
-  const { childId, sessionDate, therapistId, durationMinutes, notesText, structuredMetrics } = req.body;
+  const { childId, sessionDate, therapistId, durationMinutes, notesText, structuredMetrics, appointmentId } = req.body;
   const child = await childrenService.findById(childId);
   if (!child) {
     res.status(404).json({ error: 'Child not found' });
     return;
   }
-  if (!childrenService.canAccessChild(child.user_id, req.user!.userId, req.user!.role)) {
+  const canAccess = childrenService.canAccessChild(child.user_id, req.user!.userId, req.user!.role);
+  if (!canAccess) {
+    console.warn('[sessionsController.create] canAccessChild denied', { childUserId: child.user_id, userId: req.user!.userId, role: req.user!.role });
     res.status(403).json({ error: 'Access denied' });
     return;
   }
+  console.log('[sessionsController.create] access granted, calling sessionsService.create');
   const session = await sessionsService.create(req.user!.userId, {
     childId,
     sessionDate,
@@ -98,7 +104,9 @@ export async function create(req: Request, res: Response): Promise<void> {
     durationMinutes,
     notesText,
     structuredMetrics,
+    appointmentId: appointmentId ?? null,
   });
+  console.log('[sessionsController.create] session created', { sessionId: session.id });
   if (notesText && notesText.trim()) {
     try {
       await createEmbeddingForSession(session.id, session.child_id, notesText.trim());
@@ -117,6 +125,7 @@ export async function create(req: Request, res: Response): Promise<void> {
     therapistId: session.therapist_id,
   }).catch((err) => console.error('[notifications] notifySessionLogged failed:', err));
   const withUser = await sessionsService.findByIdWithUser(session.id);
+  console.log('[sessionsController.create] sending success response', { withUser: !!withUser });
   res.status(201).json({ session: withUser ? toSessionDtoWithUser(withUser, req.user!.role) : toSessionDto(session) });
 }
 

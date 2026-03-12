@@ -22,16 +22,13 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET ?? 'dev-secret-change-me',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN ?? '7d',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? '',
-  EMBEDDING_DIMENSION: parseInt(process.env.EMBEDDING_DIMENSION ?? '1536', 10),
-  /** Local embedding service (Python FastAPI + sentence-transformers). */
-  EMBEDDING_SERVICE_URL: process.env.EMBEDDING_SERVICE_URL ?? 'http://localhost:8000',
-  /** Local Ollama API for RAG LLM. */
-  OLLAMA_URL: process.env.OLLAMA_URL ?? 'http://localhost:11434',
-  OLLAMA_MODEL: process.env.OLLAMA_MODEL ?? 'llama3',
+  /** Embedding dimension: 768 for Gemini text-embedding-004. */
+  EMBEDDING_DIMENSION: parseInt(process.env.EMBEDDING_DIMENSION ?? '768', 10),
   /** Groq Cloud API for RAG LLM (primary). Get key: https://console.groq.com */
   GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
   GROQ_MODEL: process.env.GROQ_MODEL ?? 'llama-3.1-8b-instant',
-  /** Google Gemini API for RAG LLM (fallback when Groq fails or is unset). Get key: https://aistudio.google.com/apikey */
+  /** Google Gemini API for RAG LLM and Embeddings. Get key: https://aistudio.google.com/apikey */
   GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? '',
   GEMINI_MODEL: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
+  GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL ?? 'text-embedding-004',
 } as const;

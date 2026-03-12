@@ -39,6 +39,7 @@ class SessionsRepository {
     int? durationMinutes,
     String? notesText,
     Map<String, dynamic>? structuredMetrics,
+    String? appointmentId,
   }) async {
     try {
       final data = await _api.post<Map<String, dynamic>>('/api/sessions', {
@@ -48,6 +49,7 @@ class SessionsRepository {
         if (durationMinutes != null) 'durationMinutes': durationMinutes,
         if (notesText != null) 'notesText': notesText,
         if (structuredMetrics != null) 'structuredMetrics': structuredMetrics,
+        if (appointmentId != null) 'appointmentId': appointmentId,
       });
       return _fromJson(data!['session'] as Map<String, dynamic>);
     } on DioException catch (e) {

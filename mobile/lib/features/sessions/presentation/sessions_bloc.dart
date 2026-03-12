@@ -53,6 +53,7 @@ class SessionsBloc extends Bloc<SessionsEvent, SessionsState> {
         durationMinutes: e.durationMinutes,
         notesText: e.notesText,
         structuredMetrics: e.structuredMetrics,
+        appointmentId: e.appointmentId,
       );
       emit(SessionsState.loaded([session, ...previousList], total: current.total + 1));
     } catch (err) {

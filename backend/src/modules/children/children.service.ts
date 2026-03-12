@@ -1,6 +1,6 @@
 import { query, queryOne } from '../../config/database';
 
-const NOT_DELETED = ' AND deleted_at IS NULL';
+
 
 export type ChildRow = {
   id: string;
@@ -15,8 +15,6 @@ export type ChildRow = {
   created_at: string;
   updated_by: string | null;
   updated_at: string;
-  deleted_by: string | null;
-  deleted_at: string | null;
   // Production schema (optional columns added by migration)
   child_code?: string | null;
   gender?: string | null;
@@ -146,7 +144,7 @@ export async function create(userId: string, data: ChildCreateData): Promise<Chi
 }
 
 export async function findById(id: string): Promise<ChildRow | null> {
-  return queryOne<ChildRow>(`SELECT * FROM children WHERE id = $1${NOT_DELETED}`, [id]);
+  return queryOne<ChildRow>(`SELECT * FROM children WHERE id = $1`, [id]);
 }
 
 export type TherapyCenterRow = { id: string; name: string };
@@ -189,7 +187,7 @@ export async function findByUserId(
   const offset = opts ? Math.max(opts.offset, 0) : 0;
   const search = opts?.search?.trim();
   const canListAll = role === 'admin' || role === 'therapist';
-  const conditions: string[] = ['deleted_at IS NULL'];
+  const conditions: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
   if (!canListAll) {
@@ -203,7 +201,7 @@ export async function findByUserId(
     params.push(`%${search}%`);
     idx++;
   }
-  const where = `WHERE ${conditions.join(' AND ')}`;
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const countRows = await query<{ count: string }>(
     `SELECT COUNT(*)::text as count FROM children ${where}`,
     params
@@ -302,16 +300,16 @@ export async function update(id: string, data: ChildUpdateData): Promise<ChildRo
   if (updates.length === 0) return findById(id);
   values.push(id);
   const rows = await query<ChildRow>(
-    `UPDATE children SET ${updates.join(', ')} WHERE id = $${i} AND deleted_at IS NULL RETURNING *`,
+    `UPDATE children SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
     values
   );
   return rows[0] ?? null;
 }
 
-export async function remove(id: string, deletedByUserId: string): Promise<boolean> {
+export async function remove(id: string, _deletedByUserId: string): Promise<boolean> {
   const result = await query<{ id: string }>(
-    `UPDATE children SET deleted_by = $1, deleted_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING id`,
-    [deletedByUserId, id]
+    `DELETE FROM children WHERE id = $1 RETURNING id`,
+    [id]
   );
   return result.length > 0;
 }
@@ -319,14 +317,14 @@ export async function remove(id: string, deletedByUserId: string): Promise<boole
 export async function assignChildrenToUser(childIds: string[], userId: string): Promise<void> {
   if (childIds.length === 0) return;
   for (const childId of childIds) {
-    await query('UPDATE children SET user_id = $1, updated_by = $2, updated_at = NOW() WHERE id = $3 AND deleted_at IS NULL', [userId, userId, childId]);
+    await query('UPDATE children SET user_id = $1, updated_by = $2, updated_at = NOW() WHERE id = $3', [userId, userId, childId]);
   }
 }
 
 /** Get child IDs currently assigned to this user (parent). */
 export async function getChildIdsByUserId(userId: string): Promise<string[]> {
   const rows = await query<{ id: string }>(
-    'SELECT id FROM children WHERE user_id = $1 AND deleted_at IS NULL',
+    'SELECT id FROM children WHERE user_id = $1',
     [userId]
   );
   return rows.map((r) => r.id);
@@ -342,20 +340,21 @@ export async function setParentChildren(parentUserId: string, childIds: string[]
   if (!fallbackUserId) return;
   if (childIds.length === 0) {
     await query(
-      'UPDATE children SET user_id = $1, updated_by = $2, updated_at = NOW() WHERE user_id = $3 AND deleted_at IS NULL',
+      'UPDATE children SET user_id = $1, updated_by = $2, updated_at = NOW() WHERE user_id = $3',
       [fallbackUserId, parentUserId, parentUserId]
     );
     return;
   }
   await query(
     `UPDATE children SET user_id = $1, updated_by = $2, updated_at = NOW()
-     WHERE user_id = $3 AND deleted_at IS NULL AND id != ALL($4::uuid[])`,
+     WHERE user_id = $3 AND id != ALL($4::uuid[])`,
     [fallbackUserId, parentUserId, parentUserId, childIds]
   );
   await assignChildrenToUser(childIds, parentUserId);
 }
 
 export function canAccessChild(childUserId: string, requestUserId: string, role: string): boolean {
+  console.log('[childrenService.canAccessChild]', { childUserId, requestUserId, role });
   if (role === 'admin' || role === 'therapist') return true;
   return childUserId === requestUserId;
 }

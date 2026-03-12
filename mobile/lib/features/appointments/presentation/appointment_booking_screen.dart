@@ -25,7 +25,7 @@ class AppointmentBookingScreen extends StatefulWidget {
 }
 
 class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
-  DateTime _selectedDate = DateTime.now();
+  DateTime _selectedDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
   UserEntity? _selectedTherapist;
   ClinicSlotEntity? _selectedSlot;
   List<ClinicSlotEntity> _clinicSlots = [];
@@ -101,7 +101,19 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
   }
 
   bool _isSlotBooked(ClinicSlotEntity slot) {
+    final selectedDateStr = formatAppDateOnlyForApi(_selectedDate);
     for (final b in _bookedSlots) {
+      // 1. Check date to avoid stale data from previous fetch race conditions
+      final bDate = b['appointment_date']?.toString();
+      if (bDate != null && !bDate.contains(selectedDateStr)) continue;
+
+      // 2. Exclude current appointment being edited (don't block yourself)
+      if (widget.appointmentToEdit != null &&
+          (b['id'] == widget.appointmentToEdit!.id ||
+              b['_id'] == widget.appointmentToEdit!.id)) {
+        continue;
+      }
+
       final bStart = b['start_time'].toString().substring(0, 5); // "09:00"
       final slotStart = slot.startTime.substring(0, 5);
       if (bStart == slotStart) return true;
@@ -178,13 +190,13 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
               tileColor: Colors.grey[100],
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               onTap: () async {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
                 final picked = await showDatePicker(
                   context: context,
-                  initialDate: _selectedDate,
-                  firstDate: widget.adminMode
-                      ? DateTime.now().subtract(const Duration(days: 365))
-                      : DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 180)),
+                  initialDate: _selectedDate.isBefore(today) ? today : _selectedDate,
+                  firstDate: today,
+                  lastDate: today.add(const Duration(days: 180)),
                 );
                 if (picked != null) {
                   setState(() {
@@ -313,12 +325,54 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
 
   Widget _sectionTitle(String title) => Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15));
 
-  void _submit() {
+  Future<void> _submit() async {
     final slot = _selectedSlot!;
     final startTime = slot.startTime; // already "HH:mm:ss"
     final endTime = slot.endTime;
 
     final isEditing = widget.appointmentToEdit != null;
+
+    // -- Check for existing booking to show override confirmation --
+    if (widget.adminMode) {
+      Map<String, dynamic>? conflict;
+      final selectedDateStr = formatAppDateOnlyForApi(_selectedDate);
+      final slotStartOnly = startTime.substring(0, 5);
+
+      for (final b in _bookedSlots) {
+        final bDate = b['appointment_date']?.toString();
+        if (bDate != null && !bDate.contains(selectedDateStr)) continue;
+
+        // Skip current edit
+        if (isEditing && (b['id'] == widget.appointmentToEdit!.id || b['_id'] == widget.appointmentToEdit!.id)) {
+          continue;
+        }
+
+        final bStart = b['start_time'].toString().substring(0, 5);
+        if (bStart == slotStartOnly) {
+          conflict = b;
+          break;
+        }
+      }
+
+      if (conflict != null) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Slot Already Booked'),
+            content: Text(
+              'This slot is already booked for ${conflict!['child_name'] ?? 'someone'} '
+              'with ${conflict['therapist_name'] ?? 'this therapist'}.\n\n'
+              'Do you still want to override and book this session?'
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Override & Book')),
+            ],
+          ),
+        );
+        if (proceed != true) return;
+      }
+    }
 
     if (isEditing) {
       context.read<AppointmentsBloc>().add(AppointmentUpdateRequested(
@@ -342,8 +396,11 @@ class _AppointmentBookingScreenState extends State<AppointmentBookingScreen> {
     final msg = isEditing 
         ? (widget.adminMode ? 'Appointment rescheduled!' : 'Reschedule request sent for approval.')
         : (widget.adminMode ? 'Appointment booked and approved!' : 'Booking request sent for approval.');
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
-    Navigator.of(context).pop();
+    
+    if (mounted) {
+       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+       Navigator.of(context).pop();
+    }
   }
 
   Future<void> _openTherapistPicker() async {

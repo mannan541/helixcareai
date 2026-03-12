@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../auth/domain/user_entity.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../appointments/domain/appointment_entity.dart';
 import '../../../../core/utils/date_format.dart';
+import '../../sessions/presentation/sessions_bloc.dart';
+import '../../sessions/presentation/session_form_screen.dart';
+import '../../children/data/children_repository.dart';
+import '../../sessions/data/sessions_repository.dart';
+import '../../appointments/presentation/appointments_bloc.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.initialUser, this.showAppBar = true, this.onTabSelected});
@@ -428,9 +434,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
                     leading: const Icon(Icons.event, color: Colors.blue),
-                    title: Text('${formatAppDate(appt.appointmentDate)} (${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)})'),
+                    title: Text('${formatAppDate(appt.appointmentDate)}  •  ${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}'),
                     subtitle: Text('Child: ${appt.childFullName} \nTherapist: ${appt.therapistUser?.fullName} • $statusText'),
                     isThreeLine: true,
+                    trailing: (_user?.isTherapist == true && appt.status == AppointmentStatus.approved)
+                        ? ElevatedButton(
+                            onPressed: () => _navigateToLogSession(appt),
+                            style: ElevatedButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                            ),
+                            child: Text(appt.sessionId != null ? 'Edit Session' : 'Log Session'),
+                          )
+                        : null,
                   ),
                 );
               }).toList(),
@@ -439,6 +455,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _navigateToLogSession(AppointmentEntity appt) async {
+    try {
+      final child = await childrenRepository.getOne(appt.childId);
+      if (!mounted) return;
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => SessionsBloc(sessionsRepository),
+            child: SessionFormScreen(
+              child: child,
+              selectedAppointment: appt,
+              onSaved: () {
+                // If it was a pending/approved appointment, we usually mark it as completed after logging
+                context.read<AppointmentsBloc>().add(AppointmentStatusUpdateRequested(
+                      id: appt.id,
+                      status: 'completed',
+                    ));
+                _load(); // Refresh dashboard counts and the list
+              },
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load child: $e')));
+      }
+    }
   }
 
   void _navigateTo(BuildContext context, String route, {Object? arguments}) {

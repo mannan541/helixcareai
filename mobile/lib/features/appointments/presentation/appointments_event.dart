@@ -77,3 +77,12 @@ class AppointmentApproveRequested extends AppointmentsEvent {
   @override
   List<Object?> get props => [id];
 }
+
+class AppointmentDeleteRequested extends AppointmentsEvent {
+  final String id;
+
+  const AppointmentDeleteRequested({required this.id});
+
+  @override
+  List<Object?> get props => [id];
+}

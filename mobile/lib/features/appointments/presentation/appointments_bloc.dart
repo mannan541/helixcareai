@@ -16,6 +16,7 @@ class AppointmentsBloc extends Bloc<AppointmentsEvent, AppointmentsState> {
     on<AppointmentUpdateRequested>(_onUpdate);
     on<AppointmentStatusUpdateRequested>(_onUpdateStatus);
     on<AppointmentApproveRequested>(_onApprove);
+    on<AppointmentDeleteRequested>(_onDelete);
   }
 
   Future<void> _onList(AppointmentsListRequested e, Emitter<AppointmentsState> emit) async {
@@ -86,6 +87,17 @@ class AppointmentsBloc extends Bloc<AppointmentsEvent, AppointmentsState> {
     try {
       final updated = await _repo.approveAppointment(e.id);
       emit(AppointmentsState.loaded(prev.map((a) => a.id == updated.id ? updated : a).toList()));
+    } catch (err) {
+      emit(AppointmentsState.failure(err.toString()));
+    }
+  }
+
+  Future<void> _onDelete(AppointmentDeleteRequested e, Emitter<AppointmentsState> emit) async {
+    final prev = state.appointments;
+    emit(AppointmentsState.loading());
+    try {
+      await _repo.deleteAppointment(e.id);
+      emit(AppointmentsState.loaded(prev.where((a) => a.id != e.id).toList()));
     } catch (err) {
       emit(AppointmentsState.failure(err.toString()));
     }

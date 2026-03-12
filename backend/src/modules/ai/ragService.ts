@@ -2,7 +2,6 @@ import type { ChildRow } from '../children/children.service';
 import * as childrenService from '../children/children.service';
 import * as embeddingService from './embeddingService';
 import * as vectorSearchService from './vectorSearchService';
-import * as ollamaService from './ollamaService';
 import * as groqService from './groqService';
 import * as geminiService from './geminiService';
 
@@ -90,10 +89,8 @@ export async function askChildAssistant(
 
   const llmOptions = { childProfile: childProfile || undefined };
 
-  // Groq (primary) → Gemini (fallback) → Ollama (local)
   const tryGroq = () => groqService.askLLM(trimmedQuestion, context, llmOptions);
   const tryGemini = () => geminiService.askLLM(trimmedQuestion, context, llmOptions);
-  const tryOllama = () => ollamaService.askLLM(trimmedQuestion, context, llmOptions);
 
   const isProduction = process.env.NODE_ENV === 'production';
   const hasCloudLLM = groqService.isConfigured() || geminiService.isConfigured();
@@ -110,23 +107,15 @@ export async function askChildAssistant(
       return await tryGroq();
     } catch {
       if (geminiService.isConfigured()) {
-        try {
-          return await tryGemini();
-        } catch {
-          return await tryOllama();
-        }
+        return await tryGemini();
       }
-      return await tryOllama();
+      throw new Error('Groq failed and Gemini is not configured or failed.');
     }
   }
   if (geminiService.isConfigured()) {
-    try {
-      return await tryGemini();
-    } catch {
-      return await tryOllama();
-    }
+    return await tryGemini();
   }
-  return await tryOllama();
+  throw new Error('No cloud AI service (Groq or Gemini) is configured.');
 }
 /**
  * RAG: global assistant for all accessible children.
@@ -163,16 +152,19 @@ export async function askGlobalAssistant(
 
   const tryGroq = () => groqService.askLLM(trimmedQuestion, context, llmOptions);
   const tryGemini = () => geminiService.askLLM(trimmedQuestion, context, llmOptions);
-  const tryOllama = () => ollamaService.askLLM(trimmedQuestion, context, llmOptions);
 
   if (groqService.isConfigured()) {
-    try { return await tryGroq(); } catch {
-      if (geminiService.isConfigured()) { try { return await tryGemini(); } catch { return await tryOllama(); } }
-      return await tryOllama();
+    try {
+      return await tryGroq();
+    } catch {
+      if (geminiService.isConfigured()) {
+        return await tryGemini();
+      }
+      throw new Error('Groq failed and Gemini is not configured.');
     }
   }
   if (geminiService.isConfigured()) {
-    try { return await tryGemini(); } catch { return await tryOllama(); }
+    return await tryGemini();
   }
-  return await tryOllama();
+  throw new Error('No cloud AI service configured.');
 }

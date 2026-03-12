@@ -12,7 +12,6 @@ export type AppointmentRow = {
     approved_by: string | null;
     created_at: string;
     updated_at: string;
-    deleted_at: string | null;
 };
 
 export type AppointmentWithUserRow = AppointmentRow & {
@@ -20,6 +19,8 @@ export type AppointmentWithUserRow = AppointmentRow & {
     _child_last_name: string;
     _therapist_full_name: string;
     _therapist_email: string;
+    _therapist_title: string | null;
+    session_id: string | null;
 };
 
 export async function create(data: {
@@ -56,35 +57,44 @@ export async function list(filters: {
     status?: string;
 }): Promise<AppointmentWithUserRow[]> {
     const params: unknown[] = [];
+    const whereClauses: string[] = [];
+
     let sql = `
     SELECT a.*, 
            c.first_name AS _child_first_name, c.last_name AS _child_last_name,
-           u.full_name AS _therapist_full_name, u.email AS _therapist_email
+           u.full_name AS _therapist_full_name, u.email AS _therapist_email, u.title AS _therapist_title,
+           s.id AS session_id,
+           u_log.full_name AS session_logged_by_name
     FROM appointments a
     JOIN children c ON a.child_id = c.id
     JOIN users u ON a.therapist_id = u.id
-    WHERE a.deleted_at IS NULL
+    LEFT JOIN sessions s ON a.id = s.appointment_id
+    LEFT JOIN users u_log ON s.created_by = u_log.id
   `;
 
     if (filters.date) {
         params.push(filters.date);
-        sql += ` AND a.appointment_date = $${params.length}`;
+        whereClauses.push(`a.appointment_date = $${params.length}`);
     }
     if (filters.therapistId) {
         params.push(filters.therapistId);
-        sql += ` AND a.therapist_id = $${params.length}`;
+        whereClauses.push(`a.therapist_id = $${params.length}`);
     }
     if (filters.childId) {
         params.push(filters.childId);
-        sql += ` AND a.child_id = $${params.length}`;
+        whereClauses.push(`a.child_id = $${params.length}`);
     }
     if (filters.status) {
         params.push(filters.status);
-        sql += ` AND a.status = $${params.length}`;
+        whereClauses.push(`a.status = $${params.length}`);
     }
     if (filters.parentId) {
         params.push(filters.parentId);
-        sql += ` AND c.user_id = $${params.length}`;
+        whereClauses.push(`c.user_id = $${params.length}`);
+    }
+
+    if (whereClauses.length > 0) {
+        sql += ` WHERE ` + whereClauses.join(' AND ');
     }
 
     sql += ` ORDER BY a.appointment_date ASC, a.start_time ASC`;
@@ -103,7 +113,7 @@ export async function updateStatus(
             rows = await query<AppointmentRow>(
                 `UPDATE appointments 
              SET status = $1, approved_by = $2, updated_at = NOW()
-             WHERE id = $3 AND deleted_at IS NULL
+             WHERE id = $3
              RETURNING *`,
                 [status, adminId, id]
             );
@@ -111,7 +121,7 @@ export async function updateStatus(
             rows = await query<AppointmentRow>(
                 `UPDATE appointments 
              SET status = $1, updated_at = NOW()
-             WHERE id = $2 AND deleted_at IS NULL
+             WHERE id = $2
              RETURNING *`,
                 [status, id]
             );
@@ -125,15 +135,20 @@ export async function updateStatus(
 
 export async function findById(id: string): Promise<AppointmentRow | null> {
     return queryOne<AppointmentRow>(
-        'SELECT * FROM appointments WHERE id = $1 AND deleted_at IS NULL',
+        'SELECT * FROM appointments WHERE id = $1',
         [id]
     );
 }
 
-export async function getBookedSlots(therapistId: string, date: string): Promise<{ start_time: string; end_time: string; status: string }[]> {
-    return query<{ start_time: string; end_time: string; status: string }>(
-        `SELECT start_time, end_time, status FROM appointments 
-     WHERE therapist_id = $1 AND appointment_date = $2 AND deleted_at IS NULL AND status IN ('pending', 'approved', 'completed')`,
+export async function getBookedSlots(therapistId: string, date: string): Promise<{ id: string; start_time: string; end_time: string; appointment_date: string; status: string; child_name?: string; therapist_name?: string }[]> {
+    return query<{ id: string; start_time: string; end_time: string; appointment_date: string; status: string; child_name: string; therapist_name: string }>(
+        `SELECT a.id, a.start_time, a.end_time, a.appointment_date, a.status, 
+                (c.first_name || ' ' || c.last_name) as child_name,
+                u.full_name as therapist_name
+         FROM appointments a
+         JOIN children c ON a.child_id = c.id
+         JOIN users u ON a.therapist_id = u.id
+         WHERE a.therapist_id = $1 AND a.appointment_date = $2 AND a.status IN ('pending', 'approved', 'completed')`,
         [therapistId, date]
     );
 }
@@ -154,7 +169,7 @@ export async function count(filters: {
         sql += ` JOIN children c ON a.child_id = c.id `;
     }
 
-    sql += ` WHERE a.deleted_at IS NULL `;
+    sql += ` WHERE 1=1 `;
 
     if (filters.status) {
         if (Array.isArray(filters.status)) {
@@ -180,4 +195,14 @@ export async function count(filters: {
 
     const row = await queryOne<{ count: number }>(sql, params);
     return row?.count ?? 0;
+}
+
+export async function remove(id: string): Promise<boolean> {
+    console.log('[appointmentsService.remove] executing DELETE for id:', id);
+    const result = await query(
+        'DELETE FROM appointments WHERE id = $1 RETURNING id',
+        [id]
+    );
+    console.log('[appointmentsService.remove] rows deleted:', result.length);
+    return result.length > 0;
 }

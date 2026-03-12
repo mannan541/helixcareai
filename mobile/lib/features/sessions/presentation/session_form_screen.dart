@@ -485,6 +485,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
             durationMinutes: duration,
             notesText: notesText,
             structuredMetrics: structuredMetrics.isEmpty ? null : structuredMetrics,
+            appointmentId: widget.selectedAppointment?.id,
           ));
     }
   }

@@ -48,6 +48,7 @@ export async function listAppointments(req: Request, res: Response) {
         }
 
         const appointments = await appointmentsService.list(filters);
+        console.log('[appointmentsController.listAppointments] count:', appointments.length);
         res.json({ appointments });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -65,6 +66,7 @@ export async function approveAppointment(req: Request, res: Response) {
         }
 
         const appointment = await appointmentsService.updateStatus(id, 'approved', adminId);
+        console.log('[appointmentsController.approveAppointment] result:', { id, success: !!appointment });
         if (!appointment) {
             return res.status(404).json({ error: 'Appointment not found' });
         }
@@ -92,13 +94,18 @@ export async function updateAppointmentStatus(req: Request, res: Response) {
     try {
         const { id } = req.params;
         const { status } = req.body;
-        const adminId = (req as any).user.userId;
+        const userId = (req as any).user.userId;
+        const role = (req as any).user.role;
 
         if (!['approved', 'completed', 'cancelled'].includes(status)) {
             return res.status(400).json({ error: 'Invalid status' });
         }
 
-        const appointment = await appointmentsService.updateStatus(id, status, adminId);
+        if (status === 'approved' && role !== 'admin') {
+            return res.status(403).json({ error: 'Only admins can approve appointments' });
+        }
+
+        const appointment = await appointmentsService.updateStatus(id, status, userId);
         if (!appointment) {
             return res.status(404).json({ error: 'Appointment not found' });
         }
@@ -121,10 +128,10 @@ export async function updateAppointment(req: Request, res: Response) {
 
         const isParent = role === 'parent';
 
-        let queryStr = `UPDATE appointments SET appointment_date = $1, start_time = $2, end_time = $3, therapist_id = $4, updated_at = NOW() WHERE id = $5 AND deleted_at IS NULL RETURNING *`;
+        let queryStr = `UPDATE appointments SET appointment_date = $1, start_time = $2, end_time = $3, therapist_id = $4, updated_at = NOW() WHERE id = $5 RETURNING *`;
 
         if (isParent) {
-            queryStr = `UPDATE appointments SET appointment_date = $1, start_time = $2, end_time = $3, therapist_id = $4, status = 'pending', updated_at = NOW() WHERE id = $5 AND deleted_at IS NULL RETURNING *`;
+            queryStr = `UPDATE appointments SET appointment_date = $1, start_time = $2, end_time = $3, therapist_id = $4, status = 'pending', updated_at = NOW() WHERE id = $5 RETURNING *`;
         }
 
         const rows = await query(queryStr, [appointmentDate, startTime, endTime, therapistId, id]);
@@ -152,6 +159,31 @@ export async function updateAppointment(req: Request, res: Response) {
 
         res.json({ appointment });
     } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+}
+
+export async function deleteAppointment(req: Request, res: Response) {
+    try {
+        const { id } = req.params;
+        console.log('[appointmentsController.deleteAppointment] start', { id, userId: (req as any).user?.userId, role: (req as any).user?.role });
+
+        if ((req as any).user.role !== 'admin') {
+            console.warn('[appointmentsController.deleteAppointment] permission denied - not admin');
+            return res.status(403).json({ error: 'Only admins can delete appointments' });
+        }
+
+        const deleted = await appointmentsService.remove(id);
+        console.log('[appointmentsController.deleteAppointment] service result', { deleted });
+
+        if (!deleted) {
+            console.warn('[appointmentsController.deleteAppointment] appointment not found or already deleted', { id });
+            return res.status(404).json({ error: 'Appointment not found' });
+        }
+
+        res.status(204).send();
+    } catch (err: any) {
+        console.error('[appointmentsController.deleteAppointment] error:', err.message);
         res.status(500).json({ error: err.message });
     }
 }

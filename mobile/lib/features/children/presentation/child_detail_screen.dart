@@ -152,7 +152,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   return Card(
                     child: ListTile(
                       leading: const Icon(Icons.event),
-                      title: Text('${formatAppDate(appt.appointmentDate)} (${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)})'),
+                      title: Text('${formatAppDate(appt.appointmentDate)}  •  ${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}'),
                       subtitle: Text('Therapist: ${appt.therapistUser?.fullName} - Status: ${appt.status.toString().split('.').last.toUpperCase()}'),
                       trailing: IconButton(
                         icon: const Icon(Icons.edit_calendar, color: Colors.blue),

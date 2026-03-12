@@ -1,39 +1,48 @@
-import axios, { AxiosError } from 'axios';
+import { GoogleGenAI } from '@google/genai';
 import { env } from '../../config/env';
 
-const EMBED_URL = `${env.EMBEDDING_SERVICE_URL.replace(/\/$/, '')}/embed`;
+let client: GoogleGenAI | null = null;
+function getClient(): GoogleGenAI {
+  if (!client) {
+    if (!env.GEMINI_API_KEY) {
+      throw new Error('Gemini is not configured. Set GEMINI_API_KEY for cloud embeddings.');
+    }
+    client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+  }
+  return client;
+}
 
 /**
- * Generate embedding for text using the local Python embedding service
- * (sentence-transformers all-MiniLM-L6-v2, 384 dimensions).
+ * Generate embedding for text using Google Gemini cloud service.
+ * Defaults to text-embedding-004 (768 dimensions).
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   const trimmed = text.trim();
   if (!trimmed) {
     throw new Error('Text cannot be empty');
   }
+
   try {
-    const { data } = await axios.post<{ embedding: number[] }>(EMBED_URL, { text: trimmed }, {
-      timeout: 60_000,
-      headers: { 'Content-Type': 'application/json' },
-      validateStatus: () => true,
+    const ai = getClient();
+    const result = await ai.models.embedContent({
+      model: env.GEMINI_EMBEDDING_MODEL,
+      contents: [{ parts: [{ text: trimmed }] }],
     });
-    if (!data?.embedding || !Array.isArray(data.embedding)) {
-      throw new Error('Invalid embedding response: missing or invalid embedding array');
+    const embedding = result.embeddings?.[0]?.values;
+
+    if (!embedding || !Array.isArray(embedding)) {
+      throw new Error('Invalid embedding response from Gemini');
     }
-    if (data.embedding.length !== 384) {
-      throw new Error(`Unexpected embedding dimension: ${data.embedding.length}, expected 384`);
+
+    if (embedding.length !== env.EMBEDDING_DIMENSION) {
+      console.warn(`[embeddingService] Dimension mismatch: Got ${embedding.length}, expected ${env.EMBEDDING_DIMENSION}`);
     }
-    return data.embedding;
-  } catch (err) {
-    if (axios.isAxiosError(err)) {
-      const e = err as AxiosError<{ detail?: string }>;
-      const message = e.response?.data?.detail ?? e.message ?? 'Embedding service request failed';
-      const status = e.response?.status;
-      const error = new Error(message) as Error & { statusCode?: number };
-      error.statusCode = status ?? 502;
-      throw error;
-    }
-    throw err;
+
+    return Array.from(embedding);
+  } catch (err: any) {
+    console.error('[embeddingService] Gemini error:', err.message);
+    const error = new Error(err.message ?? 'Embedding failed') as Error & { statusCode?: number };
+    error.statusCode = 502;
+    throw error;
   }
 }

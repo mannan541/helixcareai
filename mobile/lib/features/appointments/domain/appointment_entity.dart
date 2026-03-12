@@ -18,6 +18,8 @@ class AppointmentEntity extends Equatable {
   final String? approvedBy;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? sessionId;
+  final String? sessionLoggedByName;
 
   const AppointmentEntity({
     required this.id,
@@ -34,6 +36,8 @@ class AppointmentEntity extends Equatable {
     this.approvedBy,
     required this.createdAt,
     required this.updatedAt,
+    this.sessionId,
+    this.sessionLoggedByName,
   });
 
   String get childFullName => '$childFirstName $childLastName'.trim();
@@ -54,5 +58,7 @@ class AppointmentEntity extends Equatable {
         approvedBy,
         createdAt,
         updatedAt,
+        sessionId,
+        sessionLoggedByName,
       ];
 }

@@ -21,6 +21,8 @@ final class SessionCreateRequested extends SessionsEvent {
   final int? durationMinutes;
   final String? notesText;
   final Map<String, dynamic>? structuredMetrics;
+  final String? appointmentId;
+
   const SessionCreateRequested({
     required this.childId,
     required this.sessionDate,
@@ -28,9 +30,10 @@ final class SessionCreateRequested extends SessionsEvent {
     this.durationMinutes,
     this.notesText,
     this.structuredMetrics,
+    this.appointmentId,
   });
   @override
-  List<Object?> get props => [childId, sessionDate, therapistId, durationMinutes, notesText, structuredMetrics];
+  List<Object?> get props => [childId, sessionDate, therapistId, durationMinutes, notesText, structuredMetrics, appointmentId];
 }
 
 final class SessionUpdateRequested extends SessionsEvent {

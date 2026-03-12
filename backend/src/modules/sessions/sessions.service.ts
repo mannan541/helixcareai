@@ -2,7 +2,7 @@ import { query, queryOne } from '../../config/database';
 import * as childrenService from '../children/children.service';
 import * as therapyEmbeddingStorage from '../ai/therapyEmbeddingStorage';
 
-const SESSION_NOT_DELETED = ' AND s.deleted_at IS NULL';
+const SESSION_NOT_DELETED = '';
 
 export type SessionRow = {
   id: string;
@@ -16,8 +16,7 @@ export type SessionRow = {
   created_at: string;
   updated_at: string;
   updated_by: string | null;
-  deleted_by: string | null;
-  deleted_at: string | null;
+  appointment_id: string | null;
 };
 
 export async function create(
@@ -29,11 +28,12 @@ export async function create(
     durationMinutes?: number;
     notesText?: string;
     structuredMetrics?: Record<string, unknown>;
+    appointmentId?: string | null;
   }
 ): Promise<SessionRow> {
   const rows = await query<SessionRow>(
-    `INSERT INTO sessions (child_id, created_by, therapist_id, session_date, duration_minutes, notes_text, structured_metrics)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO sessions (child_id, created_by, therapist_id, session_date, duration_minutes, notes_text, structured_metrics, appointment_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       data.childId,
@@ -43,6 +43,7 @@ export async function create(
       data.durationMinutes ?? null,
       data.notesText ?? null,
       JSON.stringify(data.structuredMetrics ?? {}),
+      data.appointmentId ?? null,
     ]
   );
   const session = rows[0];
@@ -52,7 +53,7 @@ export async function create(
   return session;
 }
 
-const SESSION_COLS = 's.id, s.child_id, s.created_by, s.therapist_id, s.session_date, s.duration_minutes, s.notes_text, s.structured_metrics, s.created_at, s.updated_at, s.updated_by, s.deleted_by, s.deleted_at';
+const SESSION_COLS = 's.id, s.child_id, s.created_by, s.therapist_id, s.session_date, s.duration_minutes, s.notes_text, s.structured_metrics, s.created_at, s.updated_at, s.updated_by, s.appointment_id';
 const CB_COLS = 'u_cb.id AS _cb_id, u_cb.full_name AS _cb_full_name, u_cb.email AS _cb_email, u_cb.title AS _cb_title';
 const TH_COLS = 'u_th.id AS _th_id, u_th.full_name AS _th_full_name, u_th.email AS _th_email, u_th.title AS _th_title, u_th.mobile_number AS _th_mobile_number, COALESCE(u_th.show_mobile_to_parents, false) AS _th_show_mobile_to_parents';
 const UB_COLS = 'u_ub.id AS _ub_id, u_ub.full_name AS _ub_full_name, u_ub.email AS _ub_email';
@@ -78,7 +79,7 @@ export type SessionWithUserRow = SessionRow & {
 };
 
 export async function findById(id: string): Promise<SessionRow | null> {
-  return queryOne<SessionRow>('SELECT * FROM sessions WHERE id = $1 AND deleted_at IS NULL', [id]);
+  return queryOne<SessionRow>('SELECT * FROM sessions WHERE id = $1', [id]);
 }
 
 type UserInfoRow = { id: string; full_name: string; email: string; title: string | null };
@@ -118,12 +119,12 @@ export async function findByChildId(
   const limit = opts ? Math.min(Math.max(opts.limit, 1), 100) : 9999;
   const offset = opts ? Math.max(opts.offset, 0) : 0;
   const countRows = await query<{ count: string }>(
-    'SELECT COUNT(*)::text as count FROM sessions WHERE child_id = $1 AND deleted_at IS NULL',
+    'SELECT COUNT(*)::text as count FROM sessions WHERE child_id = $1',
     [childId]
   );
   const total = parseInt(countRows[0]?.count ?? '0', 10);
   const rows = await query<SessionRow>(
-    'SELECT * FROM sessions WHERE child_id = $1 AND deleted_at IS NULL ORDER BY session_date DESC, created_at DESC LIMIT $2 OFFSET $3',
+    'SELECT * FROM sessions WHERE child_id = $1 ORDER BY session_date DESC, created_at DESC LIMIT $2 OFFSET $3',
     [childId, limit, offset]
   );
   return { rows, total };
@@ -136,12 +137,12 @@ export async function findByChildIdWithUser(
   const limit = opts ? Math.min(Math.max(opts.limit, 1), 100) : 9999;
   const offset = opts ? Math.max(opts.offset, 0) : 0;
   const countRows = await query<{ count: string }>(
-    `SELECT COUNT(*)::text as count FROM sessions s WHERE s.child_id = $1${SESSION_NOT_DELETED}`,
+    `SELECT COUNT(*)::text as count FROM sessions s WHERE s.child_id = $1`,
     [childId]
   );
   const total = parseInt(countRows[0]?.count ?? '0', 10);
   const rows = await query<SessionWithUserRow>(
-    `SELECT ${SESSION_COLS}, ${CB_COLS}, ${TH_COLS}, ${UB_COLS} ${SESSION_JOIN_USERS} WHERE s.child_id = $1${SESSION_NOT_DELETED} ORDER BY s.session_date DESC, s.created_at DESC LIMIT $2 OFFSET $3`,
+    `SELECT ${SESSION_COLS}, ${CB_COLS}, ${TH_COLS}, ${UB_COLS} ${SESSION_JOIN_USERS} WHERE s.child_id = $1 ORDER BY s.session_date DESC, s.created_at DESC LIMIT $2 OFFSET $3`,
     [childId, limit, offset]
   );
   const missingTherapistIds = [...new Set(rows.filter((r) => r.therapist_id && r._th_id == null).map((r) => r.therapist_id!))];
@@ -202,7 +203,7 @@ export async function update(
   if (updates.length === 0) return findById(id);
   values.push(id);
   const rows = await query<SessionRow>(
-    `UPDATE sessions SET ${updates.join(', ')} WHERE id = $${i} AND deleted_at IS NULL RETURNING *`,
+    `UPDATE sessions SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
     values
   );
   const updated = rows[0] ?? null;
@@ -214,10 +215,10 @@ export async function update(
   return updated;
 }
 
-export async function remove(id: string, deletedByUserId: string): Promise<boolean> {
+export async function remove(id: string, _deletedByUserId: string): Promise<boolean> {
   const result = await query<{ id: string }>(
-    'UPDATE sessions SET deleted_by = $1, deleted_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING id',
-    [deletedByUserId, id]
+    'DELETE FROM sessions WHERE id = $1 RETURNING id',
+    [id]
   );
   return result.length > 0;
 }
@@ -238,7 +239,7 @@ export async function canAccessSession(
 /** Count of sessions where this user is the assigned therapist (for therapist dashboard). */
 export async function countByTherapistId(therapistId: string): Promise<number> {
   const rows = await query<{ count: string }>(
-    'SELECT COUNT(*)::text AS count FROM sessions WHERE therapist_id = $1 AND deleted_at IS NULL',
+    'SELECT COUNT(*)::text AS count FROM sessions WHERE therapist_id = $1',
     [therapistId]
   );
   return parseInt(rows[0]?.count ?? '0', 10);
@@ -249,7 +250,7 @@ export async function countForParentUserId(parentUserId: string): Promise<number
   const rows = await query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM sessions s
      INNER JOIN children c ON s.child_id = c.id
-     WHERE c.user_id = $1 AND c.deleted_at IS NULL AND s.deleted_at IS NULL`,
+     WHERE c.user_id = $1`,
     [parentUserId]
   );
   return parseInt(rows[0]?.count ?? '0', 10);
@@ -299,7 +300,7 @@ export async function listSessionComments(sessionId: string): Promise<SessionCom
        u.id AS _u_id, u.full_name AS _u_full_name, u.email AS _u_email
      FROM session_comments c
      JOIN users u ON c.user_id = u.id
-     WHERE c.session_id = $1 AND c.deleted_at IS NULL ORDER BY c.created_at ASC`,
+     WHERE c.session_id = $1 ORDER BY c.created_at ASC`,
     [sessionId]
   );
   return rows;
@@ -307,7 +308,7 @@ export async function listSessionComments(sessionId: string): Promise<SessionCom
 
 export async function findCommentById(commentId: string): Promise<SessionCommentRow | null> {
   const rows = await query<SessionCommentRow>(
-    'SELECT id, session_id, user_id, comment, created_at FROM session_comments WHERE id = $1 AND deleted_at IS NULL',
+    'SELECT id, session_id, user_id, comment, created_at FROM session_comments WHERE id = $1',
     [commentId]
   );
   return rows[0] ?? null;
@@ -322,7 +323,7 @@ export async function updateSessionComment(
   const existing = await findCommentById(commentId);
   if (!existing || existing.user_id !== userId) return null;
   const rows = await query<SessionCommentRow>(
-    `UPDATE session_comments SET comment = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3 AND deleted_at IS NULL RETURNING *`,
+    `UPDATE session_comments SET comment = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3 RETURNING *`,
     [comment.trim(), userId, commentId]
   );
   const row = rows[0];
@@ -340,13 +341,13 @@ export async function updateSessionComment(
   };
 }
 
-/** Soft-delete a comment. Only the comment author can delete. Returns true if deleted. */
+/** Hard-delete a comment. Only the comment author can delete. Returns true if deleted. */
 export async function deleteSessionComment(commentId: string, userId: string): Promise<boolean> {
   const existing = await findCommentById(commentId);
   if (!existing || existing.user_id !== userId) return false;
   const result = await query(
-    'UPDATE session_comments SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2 AND deleted_at IS NULL RETURNING id',
-    [userId, commentId]
+    'DELETE FROM session_comments WHERE id = $1 RETURNING id',
+    [commentId]
   );
   return result.length > 0;
 }

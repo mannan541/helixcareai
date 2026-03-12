@@ -19,15 +19,15 @@ export async function getDashboardCounts(req: Request, res: Response): Promise<v
     total_appointments: string;
   }>(
     `SELECT
-      (SELECT COUNT(*)::text FROM children WHERE deleted_at IS NULL) AS children,
+      (SELECT COUNT(*)::text FROM children) AS children,
       (SELECT COUNT(*)::text FROM users WHERE role = 'therapist' AND deleted_at IS NULL) AS therapists,
       (SELECT COUNT(*)::text FROM users WHERE role = 'parent' AND deleted_at IS NULL) AS parents,
       (SELECT COUNT(*)::text FROM users WHERE role = 'admin' AND deleted_at IS NULL) AS admins,
       (SELECT COUNT(*)::text FROM users WHERE deleted_at IS NULL) AS total_users,
       (SELECT COUNT(*)::text FROM users WHERE deleted_at IS NULL AND approved_at IS NULL) AS pending_users,
       (SELECT COUNT(*)::text FROM clinic_slots) AS clinic_slots,
-      (SELECT COUNT(*)::text FROM appointments WHERE status = 'pending' AND deleted_at IS NULL) AS pending_appointments,
-      (SELECT COUNT(*)::text FROM appointments WHERE deleted_at IS NULL) AS total_appointments`
+      (SELECT COUNT(*)::text FROM appointments WHERE status = 'pending') AS pending_appointments,
+      (SELECT COUNT(*)::text FROM appointments) AS total_appointments`
   );
   if (!row) {
     res.json({ children: 0, therapists: 0, parents: 0, admins: 0, totalUsers: 0, pendingUsers: 0, clinicSlots: 0, pendingAppointments: 0, totalAppointments: 0 });

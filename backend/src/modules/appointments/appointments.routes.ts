@@ -15,7 +15,8 @@ router.get('/', appointmentsController.listAppointments);
 router.get('/slots', appointmentsController.getBookedSlots);
 router.put('/:id/approve', requireRoles('admin'), appointmentsController.approveAppointment);
 router.put('/:id', appointmentsController.updateAppointment);
-router.patch('/:id/status', requireRoles('admin'), appointmentsController.updateAppointmentStatus);
+router.patch('/:id/status', requireRoles('admin', 'therapist'), appointmentsController.updateAppointmentStatus);
+router.delete('/:id', requireRoles('admin'), appointmentsController.deleteAppointment);
 
 // Clinic slots (admin-managed available/blocked windows)
 router.get('/clinic-slots', clinicSlotsController.listSlots);

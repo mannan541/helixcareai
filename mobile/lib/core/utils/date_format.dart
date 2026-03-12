@@ -11,7 +11,32 @@ String formatAppDate(DateTime dt) {
 
 /// YYYY-MM-DD formatted correctly to avoid timezone shift in APIs
 String formatAppDateOnlyForApi(DateTime dt) {
+  // Use a simple string interpolation of year-month-day to be absolutely sure
+  // we don't accidentally involve UTC/Local conversions that change the day.
   return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+}
+
+/// Parses a date string strictly by extracting YYYY-MM-DD parts.
+/// This avoids the "one day back" shift caused by parsing ISO strings as UTC
+/// and then converting to a Local timezone that is behind UTC.
+DateTime parseAppDateStrictly(dynamic dateVal) {
+  if (dateVal == null) return DateTime.now();
+  final str = dateVal.toString();
+  // If it's an ISO string (contains T), take only the portion before T
+  final datePart = str.contains('T') ? str.split('T')[0] : str;
+  
+  if (datePart.length >= 10) {
+    final parts = datePart.substring(0, 10).split('-');
+    if (parts.length == 3) {
+      final y = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      final d = int.tryParse(parts[2]);
+      if (y != null && m != null && d != null) {
+        return DateTime(y, m, d);
+      }
+    }
+  }
+  return DateTime.tryParse(str) ?? DateTime.now();
 }
 
 /// Date and time: "4 Mar 2025, 2:30 PM"

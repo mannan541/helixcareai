@@ -8,6 +8,9 @@ import 'package:helixcareai_mobile/features/sessions/presentation/session_form_s
 import 'package:helixcareai_mobile/core/di/injection.dart';
 import 'package:helixcareai_mobile/features/children/data/children_repository.dart';
 import 'package:helixcareai_mobile/core/utils/date_format.dart';
+import '../../sessions/presentation/session_detail_screen.dart';
+import '../../sessions/data/sessions_repository.dart';
+import '../../auth/data/auth_repository.dart';
 
 class TherapistScheduleScreen extends StatefulWidget {
   final String therapistId;
@@ -24,7 +27,9 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDay = _focusedDay;
+    final now = DateTime.now();
+    _selectedDay = DateTime(now.year, now.month, now.day);
+    _focusedDay = _selectedDay!;
     _loadAppointments();
   }
 
@@ -69,8 +74,8 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
           return Column(
             children: [
               TableCalendar<AppointmentEntity>(
-                firstDay: DateTime.now().subtract(const Duration(days: 365)),
-                lastDay: DateTime.now().add(const Duration(days: 365)),
+                firstDay: DateTime(2020, 10, 16),
+                lastDay: DateTime(2030, 3, 14),
                 focusedDay: _focusedDay,
                 selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                 onDaySelected: (selectedDay, focusedDay) {
@@ -109,8 +114,9 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
 
                           return Card(
                             child: ListTile(
+                              onTap: appt.sessionId != null ? () => _viewSession(appt) : null,
                               title: Text(
-                                '${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}',
+                                '${formatAppDate(appt.appointmentDate)}  •  ${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Column(
@@ -128,15 +134,27 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
                                       ),
                                     ],
                                   ),
+                                  if (appt.sessionId != null) ...[
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Logged (Click to view)',
+                                      style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
                                 ],
                               ),
                               isThreeLine: true,
                               trailing: (appt.status == AppointmentStatus.approved)
                                   ? ElevatedButton(
                                       onPressed: () => _navigateToLogSession(appt),
-                                      child: const Text('Log Session'),
+                                      child: Text(appt.sessionId != null ? 'Edit Session' : 'Log Session'),
                                     )
-                                  : (isCompleted ? const Icon(Icons.check_circle, color: Colors.green) : null),
+                                  : (isCompleted && appt.sessionId != null
+                                      ? OutlinedButton(
+                                          onPressed: () => _viewSession(appt),
+                                          child: const Text('View Session'),
+                                        )
+                                      : (isCompleted ? const Icon(Icons.check_circle, color: Colors.green) : null)),
                             ),
                           );
                         },
@@ -173,6 +191,36 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText('Failed to load child info: $e')));
+    }
+  }
+
+  Future<void> _viewSession(AppointmentEntity appt) async {
+    if (appt.sessionId == null) return;
+    try {
+      final child = await childrenRepository.getOne(appt.childId);
+      final session = await sessionsRepository.getOne(appt.sessionId!);
+      final me = await authRepository.me();
+      if (!mounted) return;
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => SessionsBloc(sessionsRepository),
+            child: SessionDetailScreen(
+              child: child,
+              session: session,
+              onSaved: _loadAppointments,
+              canEdit: me?.role == 'admin' || me?.id == session.therapistId,
+              canAddNotes: true,
+              canDeleteSession: me?.role == 'admin',
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText('Failed to load session: $e')));
+      }
     }
   }
 }
