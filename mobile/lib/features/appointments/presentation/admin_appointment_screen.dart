@@ -121,7 +121,9 @@ class _AdminAppointmentApprovalScreenState extends State<AdminAppointmentApprova
                           return Card(
                             clipBehavior: Clip.antiAlias,
                             child: InkWell(
-                              onTap: appt.sessionId != null ? () => _viewSession(appt) : null,
+                              onTap: appt.sessionId != null
+                                  ? () => _viewSession(appt)
+                                  : (appt.status == AppointmentStatus.approved ? () => _navigateToLogSession(appt) : null),
                               child: Padding(
                                 padding: const EdgeInsets.all(12),
                                 child: Column(

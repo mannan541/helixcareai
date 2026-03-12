@@ -6,6 +6,13 @@ import '../domain/child_entity.dart';
 import 'children_bloc.dart';
 import 'edit_child_screen.dart';
 import '../../appointments/domain/appointment_entity.dart';
+import '../../appointments/presentation/appointments_bloc.dart';
+import '../../sessions/domain/session_entity.dart';
+import '../../sessions/data/sessions_repository.dart';
+import '../../sessions/presentation/sessions_bloc.dart';
+import '../../sessions/presentation/session_detail_screen.dart';
+import '../../sessions/presentation/session_form_screen.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../../core/widgets/linkable_text.dart';
 
 /// Arguments for the child detail route. Pass [childrenBloc] so Edit can refresh the list.
@@ -150,10 +157,26 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               return Column(
                 children: appts.map((appt) {
                   return Card(
+                    clipBehavior: Clip.antiAlias,
                     child: ListTile(
+                      onTap: appt.sessionId != null
+                          ? () => _viewSession(context, appt)
+                          : (appt.status == AppointmentStatus.approved
+                              ? () => _navigateToLogSession(context, appt)
+                              : null),
                       leading: const Icon(Icons.event),
                       title: Text('${formatAppDate(appt.appointmentDate)}  •  ${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}'),
-                      subtitle: Text('Therapist: ${appt.therapistUser?.fullName} - Status: ${appt.status.toString().split('.').last.toUpperCase()}'),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Therapist: ${appt.therapistUser?.fullName} - Status: ${appt.status.toString().split('.').last.toUpperCase()}'),
+                          if (appt.sessionId != null)
+                            const Text(
+                              'Logged (Click to view)',
+                              style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold),
+                            ),
+                        ],
+                      ),
                       trailing: IconButton(
                         icon: const Icon(Icons.edit_calendar, color: Colors.blue),
                         tooltip: 'Reschedule',
@@ -223,6 +246,71 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete: ${e.toString()}')));
+    }
+  }
+
+  Future<void> _viewSession(BuildContext context, AppointmentEntity appt) async {
+    if (appt.sessionId == null) return;
+    try {
+      final session = await sessionsRepository.getOne(appt.sessionId!);
+      final me = await authRepository.me();
+      if (!mounted) return;
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => SessionsBloc(sessionsRepository),
+            child: SessionDetailScreen(
+              child: _child,
+              session: session,
+              onSaved: () => setState(() {}),
+              canEdit: me?.role == 'admin' || me?.id == session.therapistId,
+              canAddNotes: true,
+              canDeleteSession: me?.role == 'admin',
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText('Failed to load session: $e')));
+      }
+    }
+  }
+
+  Future<void> _navigateToLogSession(BuildContext context, AppointmentEntity appt) async {
+    // Only therapists and admins can log sessions
+    final me = await authRepository.me();
+    if (me?.role == 'parent') return;
+
+    try {
+      SessionEntity? existingSession;
+      if (appt.sessionId != null) {
+        existingSession = await sessionsRepository.getOne(appt.sessionId!);
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => SessionsBloc(sessionsRepository),
+            child: SessionFormScreen(
+              child: _child,
+              session: existingSession,
+              selectedAppointment: appt,
+              onSaved: () {
+                appointmentsRepository.updateStatus(appt.id, 'completed').then((_) {
+                  if (mounted) setState(() {});
+                });
+              },
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: SelectableText('Failed to load info: $e')));
+      }
     }
   }
 }

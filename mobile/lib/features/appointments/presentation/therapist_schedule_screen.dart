@@ -115,7 +115,9 @@ class _TherapistScheduleScreenState extends State<TherapistScheduleScreen> {
 
                           return Card(
                             child: ListTile(
-                              onTap: appt.sessionId != null ? () => _viewSession(appt) : null,
+                              onTap: appt.sessionId != null
+                                  ? () => _viewSession(appt)
+                                  : (appt.status == AppointmentStatus.approved ? () => _navigateToLogSession(appt) : null),
                               title: Text(
                                 '${formatAppDate(appt.appointmentDate)}  •  ${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
