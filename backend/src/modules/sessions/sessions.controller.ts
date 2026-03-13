@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import * as sessionsService from './sessions.service';
 import * as childrenService from '../children/children.service';
-import { createEmbeddingForSession } from '../ai/ai.service';
 import * as notificationsEmit from '../notifications/notifications.emit';
 
 function toSessionDto(s: sessionsService.SessionRow) {
@@ -107,13 +106,6 @@ export async function create(req: Request, res: Response): Promise<void> {
     appointmentId: appointmentId ?? null,
   });
   console.log('[sessionsController.create] session created', { sessionId: session.id });
-  if (notesText && notesText.trim()) {
-    try {
-      await createEmbeddingForSession(session.id, session.child_id, notesText.trim());
-    } catch (e) {
-      console.error('Failed to create session embedding:', e);
-    }
-  }
   const childName = `${child.first_name} ${child.last_name}`.trim() || 'Child';
   notificationsEmit.notifySessionLogged({
     sessionId: session.id,

@@ -30,5 +30,5 @@ export const env = {
   /** Google Gemini API for RAG LLM and Embeddings. Get key: https://aistudio.google.com/apikey */
   GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? '',
   GEMINI_MODEL: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
-  GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL ?? 'text-embedding-004',
+  GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL ?? 'models/embedding-001',
 } as const;
