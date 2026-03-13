@@ -137,7 +137,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Booked Appointments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Booked Appointments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              TextButton(
+                onPressed: () => Navigator.of(context).pushNamed('/child_schedule', arguments: _child),
+                child: const Text('View Calendar'),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           FutureBuilder<List<AppointmentEntity>>(
             future: appointmentsRepository.listAppointments(childId: _child.id),

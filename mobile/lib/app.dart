@@ -22,6 +22,7 @@ import 'features/appointments/presentation/therapist_schedule_screen.dart';
 import 'features/appointments/presentation/admin_appointment_screen.dart';
 import 'features/appointments/presentation/admin_slot_management_screen.dart';
 import 'features/appointments/presentation/parent_schedule_screen.dart';
+import 'features/appointments/presentation/child_appointments_screen.dart';
 import 'features/appointments/domain/appointment_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection.dart';
@@ -153,6 +154,16 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
               create: (_) => AppointmentsBloc(appointmentsRepository),
               child: const ParentScheduleScreen(),
             ),
+        '/child_schedule': (ctx) {
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          if (args is! ChildEntity) {
+            return const Scaffold(body: Center(child: Text('Invalid child')));
+          }
+          return BlocProvider(
+            create: (_) => AppointmentsBloc(appointmentsRepository),
+            child: ChildAppointmentsScreen(child: args),
+          );
+        },
       },
     );
   }
