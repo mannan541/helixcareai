@@ -23,6 +23,7 @@ import 'features/appointments/presentation/admin_appointment_screen.dart';
 import 'features/appointments/presentation/admin_slot_management_screen.dart';
 import 'features/appointments/presentation/parent_schedule_screen.dart';
 import 'features/appointments/presentation/child_appointments_screen.dart';
+import 'features/children/domain/child_entity.dart';
 import 'features/appointments/domain/appointment_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection.dart';
