@@ -4,6 +4,8 @@ import * as embeddingService from './embeddingService';
 import * as vectorSearchService from './vectorSearchService';
 import * as groqService from './groqService';
 import * as geminiService from './geminiService';
+import * as sessionContextService from './sessionContextService';
+import * as therapyEmbeddingStorage from './therapyEmbeddingStorage';
 
 const DEFAULT_TOP_K = 5;
 
@@ -74,18 +76,40 @@ export async function askChildAssistant(
 
   const topK = options.topK ?? DEFAULT_TOP_K;
 
+  // Backfill any sessions not yet in the AI index before answering.
+  try {
+    await therapyEmbeddingStorage.syncMissingSessionEmbeddings(childId);
+  } catch (err) {
+    console.error('[ragService] syncMissingSessionEmbeddings failed:', err);
+  }
+
   const child = await childrenService.findById(childId);
   const childProfile = child ? formatChildProfileForAI(child) : '';
 
-  let context = '';
+  const contextParts: string[] = [];
+
+  try {
+    const recent = await sessionContextService.getRecentSessionSummaries(childId, 15);
+    if (recent.length > 0) {
+      contextParts.push(
+        'Recent therapy sessions (newest first):\n' + recent.map((s, i) => `[Session ${i + 1}]\n${s}`).join('\n\n---\n\n')
+      );
+    }
+  } catch (_e) {
+    // continue without recent summaries
+  }
+
   try {
     const embedding = await embeddingService.generateEmbedding(trimmedQuestion);
     const notes = await vectorSearchService.findRelevantNotes(childId, embedding, topK);
-    context = notes.length > 0 ? notes.join('\n\n---\n\n') : '';
+    if (notes.length > 0) {
+      contextParts.push('Relevant session records (semantic search):\n' + notes.join('\n\n---\n\n'));
+    }
   } catch (_e) {
-    // Embedding service unreachable (e.g. on Vercel without Python service): answer from child profile only
-    context = '';
+    // Embedding service unreachable: still have recent summaries + child profile
   }
+
+  const context = contextParts.join('\n\n==========\n\n');
 
   const llmOptions = { childProfile: childProfile || undefined };
 
@@ -131,11 +155,40 @@ export async function askGlobalAssistant(
 
   const topK = options.topK ?? DEFAULT_TOP_K;
 
+  try {
+    await Promise.all(
+      childIds.map((id) => therapyEmbeddingStorage.syncMissingSessionEmbeddings(id))
+    );
+  } catch (err) {
+    console.error('[ragService] global syncMissingSessionEmbeddings failed:', err);
+  }
+
   // Gathering summaries for better global overview
   const children = await Promise.all(childIds.map(id => childrenService.findById(id)));
   const childrenContext = children.filter(Boolean).map(c => `- ${c!.first_name} ${c!.last_name} (${c!.status ?? 'active'}, diag: ${c!.diagnosis_type ?? 'none'})`).join('\n');
 
   let context = 'Summary of accessible children:\n' + childrenContext + '\n\n';
+
+  try {
+    const sessionBlocks: string[] = [];
+    for (const id of childIds.slice(0, 5)) {
+      const child = children.find((c) => c?.id === id);
+      const name = child ? `${child.first_name} ${child.last_name}` : id;
+      const recent = await sessionContextService.getRecentSessionSummaries(id, 5);
+      if (recent.length > 0) {
+        sessionBlocks.push(
+          `Recent sessions for ${name}:\n` +
+            recent.map((s, i) => `[${i + 1}]\n${s}`).join('\n\n---\n\n')
+        );
+      }
+    }
+    if (sessionBlocks.length > 0) {
+      context += sessionBlocks.join('\n\n==========\n\n') + '\n\n';
+    }
+  } catch (_e) {
+    // continue
+  }
+
   try {
     const embedding = await embeddingService.generateEmbedding(trimmedQuestion);
     // Find relevant notes across ALL provided child IDs

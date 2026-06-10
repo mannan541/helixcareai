@@ -15,6 +15,7 @@ import 'features/admin/presentation/edit_user_screen.dart';
 import 'features/admin/presentation/users_list_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/analytics/presentation/analytics_screen.dart';
+import 'features/reports/presentation/child_report_screen.dart';
 import 'features/notifications/presentation/notifications_screen.dart';
 import 'features/appointments/presentation/appointments_bloc.dart';
 import 'features/appointments/presentation/appointment_booking_screen.dart';
@@ -121,6 +122,7 @@ class _HelixCareAIAppState extends State<HelixCareAIApp> {
         },
         '/chat': (_) => const ChatScreen(),
         '/analytics': (_) => const AnalyticsScreen(),
+        '/child_report': (_) => const ChildReportScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/book_appointment': (ctx) {
           final args = ModalRoute.of(ctx)?.settings.arguments;

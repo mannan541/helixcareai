@@ -129,6 +129,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           const SizedBox(height: 8),
           Card(
             child: ListTile(
+              leading: const Icon(Icons.summarize_outlined),
+              title: const Text('Export report'),
+              subtitle: const Text('Attendance, performance & progress by date range'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).pushNamed('/child_report', arguments: _child),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
               leading: const Icon(Icons.chat),
               title: const Text('Chatbot'),
               subtitle: const Text('Ask about this child\'s progress'),

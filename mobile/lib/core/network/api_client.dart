@@ -7,6 +7,8 @@ class ApiClient {
   String? _token;
   void Function()? _onUnauthorized;
 
+  String get baseUrl => _dio.options.baseUrl;
+
   ApiClient() {
     final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
 
@@ -95,5 +97,15 @@ class ApiClient {
 
   Future<void> delete(String path) async {
     await _dio.delete(path);
+  }
+
+  /// For CSV, plain text, or other non-JSON responses.
+  Future<String> getPlain(String path, {Map<String, dynamic>? queryParameters}) async {
+    final r = await _dio.get<String>(
+      path,
+      queryParameters: queryParameters,
+      options: Options(responseType: ResponseType.plain),
+    );
+    return r.data ?? '';
   }
 }

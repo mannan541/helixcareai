@@ -10,7 +10,10 @@ const groq =
   : null;
 
 const SYSTEM_PROMPT = `You are a therapy assistant helping therapists and parents understand a child's therapy progress and profile.
-Use the Child Profile and Therapy Notes below to answer the question accurately.
+Use the Child Profile and session data below (recent sessions, metrics like engagement/focus/communication, and therapist notes) to answer accurately.
+IMPORTANT: If the Session data section lists therapy sessions with notes or metrics, you MUST use that information. Never say there are "no notes" or "no session data" when sessions are provided below.
+When asked about activities, list specific activities from therapist notes (bullet points, worksheets, games, speech tasks, etc.) with session dates.
+When asked about performance, attendance, or progress, cite specific session dates and metric values.
 Answer clearly and professionally in English. Format any dates in English (e.g. 4 Mar 2025, 2:30 PM).`;
 
 function buildMessages(context: string, question: string, childProfile?: string): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
@@ -23,8 +26,8 @@ ${childProfile.trim()}
       : '';
   const systemContent = `${SYSTEM_PROMPT}
 
-${profileSection}Therapy Notes (session notes and progress):
-${context || 'No therapy notes available for this child.'}`;
+${profileSection}Session data (recent sessions, metrics, and relevant records):
+${context || 'No session data indexed yet for this child. Encourage logging sessions with metrics and notes.'}`;
   return [
     { role: 'system', content: systemContent },
     { role: 'user', content: question },
@@ -53,7 +56,7 @@ export async function askLLM(
   const completion = await groq.chat.completions.create({
     model,
     messages,
-    max_tokens: options?.maxTokens ?? 500,
+    max_tokens: options?.maxTokens ?? 1200,
     temperature: 0.3,
   });
   const answer = (completion.choices[0]?.message?.content ?? '').trim();

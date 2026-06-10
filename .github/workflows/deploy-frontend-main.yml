@@ -37,6 +37,10 @@ jobs:
           cp .env.production .env
           echo "Using API_BASE_URL from .env.production: $(grep -v '^#' .env | grep API_BASE_URL || true)"
 
+      - name: Prepare env assets
+        working-directory: mobile
+        run: touch .env.local
+
       - name: Install dependencies
         working-directory: mobile
         run: flutter pub get

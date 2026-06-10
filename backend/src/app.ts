@@ -17,6 +17,7 @@ import analyticsRoutes from './modules/analytics/analytics.routes';
 import aiRoutes from './modules/ai/aiRoutes';
 import notificationsRoutes from './modules/notifications/notifications.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
+import reportsRoutes from './modules/reports/reports.routes';
 
 const app = express();
 
@@ -28,7 +29,8 @@ app.use(
         !origin ||
         /^https:\/\/(helixcareaifrontend|mobile|helixcareai)(-\w+)?\.vercel\.app$/i.test(origin) ||
         /^http:\/\/localhost(:\d+)?$/i.test(origin) ||
-        /^http:\/\/127\.0\.0\.1(:\d+)?$/i.test(origin);
+        /^http:\/\/127\.0\.0\.1(:\d+)?$/i.test(origin) ||
+        /^http:\/\/\[::1\](:\d+)?$/i.test(origin);
       cb(null, allowed ? origin || true : false);
     },
     credentials: true,
@@ -45,6 +47,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
+app.use('/api/reports', reportsRoutes);
 
 app.get('/api-docs/spec', (req, res) => res.json(specWithServer(req)));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, { customSiteTitle: 'HelixCareAI API', swaggerOptions: { url: '/api-docs/spec' } }));

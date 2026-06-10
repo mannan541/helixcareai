@@ -14,5 +14,10 @@ void main() async {
   } catch (_) {
     // No .env: API_BASE_URL falls back to http://localhost:3000 in ApiClient
   }
+  try {
+    await dotenv.load(fileName: '.env.local', mergeWith: dotenv.env);
+  } catch (_) {
+    // Optional local overrides (gitignored)
+  }
   runApp(const HelixCareAIApp());
 }

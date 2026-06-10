@@ -14,7 +14,7 @@ function getClient(): GoogleGenAI {
 
 /**
  * Generate embedding for text using Google Gemini cloud service.
- * Defaults to text-embedding-004 (768 dimensions).
+ * Defaults to gemini-embedding-001 (768 dimensions via outputDimensionality).
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   const trimmed = text.trim();
@@ -27,6 +27,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     const result = await ai.models.embedContent({
       model: env.GEMINI_EMBEDDING_MODEL,
       contents: [{ parts: [{ text: trimmed }] }],
+      config: { outputDimensionality: env.EMBEDDING_DIMENSION },
     });
     const embedding = result.embeddings?.[0]?.values;
 

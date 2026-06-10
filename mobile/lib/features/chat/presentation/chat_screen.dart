@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -50,7 +51,22 @@ class _ChatViewState extends State<_ChatView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: widget.showAppBar
-          ? AppBar(title: Text(widget.child == null ? 'AI Assistant' : 'Chat — ${widget.child!.fullName}'))
+          ? AppBar(
+              title: Text(widget.child == null ? 'AI Assistant' : 'Chat — ${widget.child!.fullName}'),
+              bottom: kDebugMode
+                  ? PreferredSize(
+                      preferredSize: const Size.fromHeight(22),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          'API: ${apiClient.baseUrl}',
+                          style: const TextStyle(fontSize: 11),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : null,
+            )
           : null,
       body: BlocConsumer<ChatBloc, ChatState>(
 

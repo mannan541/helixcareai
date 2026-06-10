@@ -90,6 +90,10 @@ jobs:
             fi
           fi
 
+      - name: Prepare env assets
+        working-directory: mobile
+        run: touch .env.local
+
       - name: Install dependencies
         working-directory: mobile
         run: flutter pub get

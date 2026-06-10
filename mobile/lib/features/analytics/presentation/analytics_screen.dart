@@ -92,7 +92,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: Text('Performance — ${child.fullName}')),
+      appBar: AppBar(
+        title: Text('Performance — ${child.fullName}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.summarize_outlined),
+            tooltip: 'Export report',
+            onPressed: () => Navigator.of(context).pushNamed('/child_report', arguments: child),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () => _load(context),
         child: ListView(

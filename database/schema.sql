@@ -168,13 +168,13 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_session_id ON embeddings(session_id);
 -- Cosine distance for similarity search (<=> operator)
 CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
--- ============== THERAPY EMBEDDINGS (local RAG: sentence-transformers all-MiniLM-L6-v2, 384 dims) ==============
+-- ============== THERAPY EMBEDDINGS (Gemini text-embedding, 768 dims) ==============
 CREATE TABLE IF NOT EXISTS therapy_embeddings (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   child_id   UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
   session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
   note_text  TEXT NOT NULL,
-  embedding  VECTOR(384) NOT NULL,
+  embedding  VECTOR(768) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_therapy_embeddings_child_id ON therapy_embeddings(child_id);
@@ -607,3 +607,15 @@ FROM (VALUES
   ('02:15 PM - 03:00 PM', '14:15', '15:00')
 ) AS t(label, start_time, end_time)
 WHERE NOT EXISTS (SELECT 1 FROM clinic_slots LIMIT 1);
+
+-- Migration: therapy_embeddings vector 384 -> 768 (Gemini). Clears stale vectors if resize fails.
+DROP INDEX IF EXISTS idx_therapy_embeddings_vector;
+DO $$
+BEGIN
+  ALTER TABLE therapy_embeddings ALTER COLUMN embedding TYPE vector(768);
+EXCEPTION
+  WHEN OTHERS THEN
+    TRUNCATE therapy_embeddings;
+    ALTER TABLE therapy_embeddings ALTER COLUMN embedding TYPE vector(768);
+END $$;
+CREATE INDEX IF NOT EXISTS idx_therapy_embeddings_vector ON therapy_embeddings USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);

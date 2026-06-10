@@ -6,7 +6,7 @@ export type TherapyNoteRow = {
 
 /**
  * Find relevant therapy notes for a child by embedding similarity (L2 distance).
- * Uses therapy_embeddings table (384-dim vectors from all-MiniLM-L6-v2).
+ * Uses therapy_embeddings table (768-dim Gemini embeddings).
  */
 export async function findRelevantNotes(
   childId: string,

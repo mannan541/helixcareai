@@ -1,6 +1,7 @@
 import { query, queryOne } from '../../config/database';
 import * as childrenService from '../children/children.service';
 import * as therapyEmbeddingStorage from '../ai/therapyEmbeddingStorage';
+import * as progressService from './progress.service';
 
 const SESSION_NOT_DELETED = '';
 
@@ -47,8 +48,8 @@ export async function create(
     ]
   );
   const session = rows[0];
-  therapyEmbeddingStorage.storeSessionNotes(session.id, session.child_id, session.notes_text ?? '').catch((err) =>
-    console.error('[sessions] therapy_embeddings sync failed:', err)
+  syncSessionToAI(session, createdByUserId).catch((err) =>
+    console.error('[sessions] AI sync failed:', err)
   );
   return session;
 }
@@ -208,8 +209,9 @@ export async function update(
   );
   const updated = rows[0] ?? null;
   if (updated) {
-    therapyEmbeddingStorage.storeSessionNotes(updated.id, updated.child_id, updated.notes_text ?? '').catch((err) =>
-      console.error('[sessions] therapy_embeddings sync failed:', err)
+    const by = data.updatedBy ?? updated.created_by;
+    syncSessionToAI(updated, by).catch((err) =>
+      console.error('[sessions] AI sync failed:', err)
     );
   }
   return updated;
@@ -221,6 +223,21 @@ export async function remove(id: string, _deletedByUserId: string): Promise<bool
     [id]
   );
   return result.length > 0;
+}
+
+async function syncSessionToAI(session: SessionRow, userId: string): Promise<void> {
+  await therapyEmbeddingStorage.storeSessionData(session.id, session.child_id, {
+    sessionDate: session.session_date,
+    durationMinutes: session.duration_minutes,
+    notesText: session.notes_text,
+    structuredMetrics: session.structured_metrics,
+  });
+  await progressService.recordSessionProgress(
+    session.child_id,
+    session.session_date,
+    session.structured_metrics ?? {},
+    userId
+  );
 }
 
 export async function canAccessSession(

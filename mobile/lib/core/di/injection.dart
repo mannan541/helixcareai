@@ -5,6 +5,7 @@ import '../../features/sessions/data/sessions_repository.dart';
 import '../../features/chat/data/chat_repository.dart';
 import '../../features/analytics/data/analytics_repository.dart';
 import '../../features/appointments/data/appointments_repository.dart';
+import '../../features/reports/data/reports_repository.dart';
 
 final apiClient = ApiClient();
 
@@ -14,3 +15,4 @@ final sessionsRepository = SessionsRepository(apiClient);
 final chatRepository = ChatRepository(apiClient);
 final analyticsRepository = AnalyticsRepository(apiClient);
 final appointmentsRepository = AppointmentsRepository(apiClient);
+final reportsRepository = ReportsRepository(apiClient);
