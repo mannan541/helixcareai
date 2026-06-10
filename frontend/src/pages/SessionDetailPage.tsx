@@ -23,7 +23,7 @@ import {
   ConfirmDialog,
 } from '../components/ui';
 import BackButton from '../components/BackButton';
-import { formatDate, formatDateTime } from '../utils/format';
+import { formatDate, formatDateTime, sessionMetricLabel } from '../utils/format';
 
 export default function SessionDetailPage() {
   const { childId, sessionId } = useParams<{ childId: string; sessionId: string }>();
@@ -158,7 +158,7 @@ export default function SessionDetailPage() {
           <div className="flex flex-wrap gap-2">
             {metricEntries.map(([k, v]) => (
               <span key={k} className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm">
-                <span className="capitalize text-slate-600">{k}</span>: <b>{String(v)}</b>
+                <span className="text-slate-600">{sessionMetricLabel(k)}</span>: <b>{String(v)}</b>
               </span>
             ))}
           </div>

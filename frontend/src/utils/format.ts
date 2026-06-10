@@ -43,3 +43,13 @@ export function toDateInput(value: string | Date | null | undefined): string {
 export function todayInput(): string {
   return toDateInput(new Date());
 }
+
+const SESSION_METRIC_LABELS: Record<string, string> = {
+  engagement: 'Engagement',
+  focus: 'Focus',
+  communication: 'Communication',
+};
+
+export function sessionMetricLabel(key: string): string {
+  return SESSION_METRIC_LABELS[key] ?? (key ? key.charAt(0).toUpperCase() + key.slice(1) : key);
+}

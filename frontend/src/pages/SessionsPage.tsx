@@ -7,7 +7,7 @@ import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Card, Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary } from '../components/ui';
 import BackButton from '../components/BackButton';
-import { formatDate } from '../utils/format';
+import { formatDate, sessionMetricLabel } from '../utils/format';
 
 export default function SessionsPage() {
   const { childId } = useParams<{ childId: string }>();
@@ -90,7 +90,7 @@ export default function SessionsPage() {
                       {(['engagement', 'focus', 'communication'] as const).map((k) =>
                         metrics[k] != null ? (
                           <span key={k} className="rounded bg-slate-100 px-2 py-1">
-                            <span className="capitalize">{k}</span>: <b>{String(metrics[k])}</b>
+                            {sessionMetricLabel(k)}: <b>{String(metrics[k])}</b>
                           </span>
                         ) : null
                       )}
