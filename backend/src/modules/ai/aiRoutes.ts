@@ -18,6 +18,17 @@ router.post(
 );
 
 router.post(
+  '/convert-notes',
+  validate([
+    body('childId').isUUID(),
+    body('notesText').trim().notEmpty(),
+    body('therapyTitle').optional().isString(),
+    body('structuredMetrics').optional().isObject(),
+  ]),
+  aiController.convertNotes
+);
+
+router.post(
   '/reindex/child/:childId',
   validate([param('childId').isUUID()]),
   reindexController.reindexChild

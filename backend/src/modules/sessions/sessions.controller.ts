@@ -20,8 +20,19 @@ function toSessionDto(s: sessionsService.SessionRow) {
   };
 }
 
+function hasParentFriendlyContent(metrics: Record<string, unknown>): boolean {
+  return Boolean(
+    (metrics.parentSummary && String(metrics.parentSummary).trim()) ||
+      (metrics.progressUpdate && String(metrics.progressUpdate).trim()) ||
+      (metrics.homeRecommendations && String(metrics.homeRecommendations).trim())
+  );
+}
+
 function toSessionDtoWithUser(s: sessionsService.SessionWithUserRow, requesterRole?: string) {
   const base = toSessionDto(s);
+  if (requesterRole === 'parent' && hasParentFriendlyContent(base.structuredMetrics ?? {})) {
+    base.notesText = null;
+  }
   const createdByUser =
     s._cb_id != null
       ? { id: s._cb_id, fullName: s._cb_full_name ?? '', email: s._cb_email ?? '', title: s._cb_title ?? null }

@@ -63,6 +63,29 @@ export async function askLLM(
   return answer || 'No response generated.';
 }
 
+/** Direct system + user completion (non-RAG tasks). */
+export async function complete(
+  systemPrompt: string,
+  userPrompt: string,
+  options: GenerateOptions & { temperature?: number } = {}
+): Promise<string> {
+  if (!groq) {
+    throw new Error('Groq is not configured. Set GROQ_API_KEY in your env.');
+  }
+  const model = options?.model ?? env.GROQ_MODEL;
+  const completion = await groq.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    max_tokens: options?.maxTokens ?? 800,
+    temperature: options?.temperature ?? 0.35,
+  });
+  const answer = (completion.choices[0]?.message?.content ?? '').trim();
+  return answer || 'No response generated.';
+}
+
 export function isConfigured(): boolean {
   return Boolean(env.GROQ_API_KEY);
 }

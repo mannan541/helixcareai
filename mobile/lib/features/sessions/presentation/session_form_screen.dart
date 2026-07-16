@@ -8,6 +8,8 @@ import 'package:helixcareai_mobile/features/auth/domain/user_entity.dart';
 import 'package:helixcareai_mobile/features/sessions/domain/session_entity.dart';
 import 'package:helixcareai_mobile/features/children/domain/child_entity.dart';
 import 'package:helixcareai_mobile/features/appointments/domain/appointment_entity.dart';
+import 'package:helixcareai_mobile/core/utils/session_metrics.dart';
+import 'package:helixcareai_mobile/core/widgets/metric_scale_picker.dart';
 
 class SessionFormScreen extends StatefulWidget {
   const SessionFormScreen({
@@ -49,7 +51,8 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   final _durationController = TextEditingController();
   final _notesController = TextEditingController();
   final _timeSlotController = TextEditingController();
-  final Map<String, TextEditingController> _metricControllers = {};
+  late Map<String, dynamic> _metricPickers;
+  bool _showAdditionalMetrics = false;
   String? _therapyTitle;
   UserEntity? _selectedTherapist;
   bool _saving = false;
@@ -114,14 +117,8 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       autoTimeSlot = '${formatAppTimeString(appt.startTime)} - ${formatAppTimeString(appt.endTime)}';
     }
     _timeSlotController.text = metrics['timeSlot']?.toString() ?? autoTimeSlot;
-    for (final e in metrics.entries) {
-      _metricControllers[e.key] = TextEditingController(text: e.value?.toString() ?? '');
-    }
-    if (_metricControllers.isEmpty) {
-      _metricControllers['engagement'] = TextEditingController(text: '5');
-      _metricControllers['focus'] = TextEditingController(text: '5');
-      _metricControllers['communication'] = TextEditingController(text: '5');
-    }
+    _metricPickers = loadPickerValuesFromMetrics(metrics);
+    _showAdditionalMetrics = additionalSessionMetrics.any((k) => _metricPickers[k] != '' && _metricPickers[k] != null);
     if (_selectedTherapist == null) {
       authRepository.me().then((me) {
         if (me != null && (me.role == 'therapist' || me.isTherapist) && mounted && _selectedTherapist == null) {
@@ -171,9 +168,6 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     _durationController.dispose();
     _notesController.dispose();
     _timeSlotController.dispose();
-    for (final c in _metricControllers.values) {
-      c.dispose();
-    }
     super.dispose();
   }
 
@@ -293,19 +287,50 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 20),
-            const Text('Structured metrics', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Session metrics', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(
+              'Rate each area 1–5 after the session. Scores are saved as 0–10 for parent reports and progress charts.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            const MetricScaleLegend(),
+            const SizedBox(height: 16),
+            const Text('Core metrics', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            ..._metricControllers.entries.map((e) => Padding(
+            for (final key in coreSessionMetrics)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: MetricScalePicker(
+                  metricKey: key,
+                  value: _metricPickers[key] ?? 3,
+                  onChanged: (v) => setState(() => _metricPickers[key] = v == '' ? 3 : v),
+                ),
+              ),
+            TextButton(
+              onPressed: () => setState(() => _showAdditionalMetrics = !_showAdditionalMetrics),
+              child: Text(
+                _showAdditionalMetrics ? '− Hide additional clinical metrics' : '+ Additional clinical metrics (optional)',
+              ),
+            ),
+            if (_showAdditionalMetrics) ...[
+              const Divider(),
+              Text(
+                'Especially useful for ADHD/ASD tracking: instructions, social skills, regulation, and more.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              for (final key in additionalSessionMetrics)
+                Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: TextFormField(
-                    controller: e.value,
-                    decoration: InputDecoration(
-                      labelText: _metricLabel(e.key),
-                      hintText: '1-10 or value',
-                    ),
-                    keyboardType: TextInputType.number,
+                  child: MetricScalePicker(
+                    metricKey: key,
+                    value: _metricPickers[key] ?? '',
+                    optional: true,
+                    onChanged: (v) => setState(() => _metricPickers[key] = v),
                   ),
-                )),
+                ),
+            ],
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -448,23 +473,18 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
     }
   }
 
-  String _metricLabel(String key) {
-    return key.replaceFirst(key[0], key[0].toUpperCase());
-  }
-
   void _submit(BuildContext context) {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
-    final structuredMetrics = <String, dynamic>{};
+    final structuredMetrics = <String, dynamic>{
+      ...buildStoredMetricsFromPickers(_metricPickers),
+    };
     if (_therapyTitle != null) structuredMetrics['therapyTitle'] = _therapyTitle;
     final timeSlot = _timeSlotController.text.trim();
     if (timeSlot.isNotEmpty) structuredMetrics['timeSlot'] = timeSlot;
-    for (final e in _metricControllers.entries) {
-      final v = e.value.text.trim();
-      if (v.isNotEmpty) {
-        final numVal = int.tryParse(v) ?? double.tryParse(v);
-        structuredMetrics[e.key] = numVal ?? v;
-      }
+    final existing = widget.session?.structuredMetrics ?? {};
+    for (final key in sessionMetaKeys) {
+      if (existing[key] != null) structuredMetrics[key] = existing[key];
     }
     final duration = int.tryParse(_durationController.text.trim());
     final notesText = _notesController.text.trim().isEmpty ? null : _notesController.text.trim();

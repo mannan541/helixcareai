@@ -16,12 +16,21 @@ import SessionDetailPage from './pages/SessionDetailPage';
 import ChatPage from './pages/ChatPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ChildReportPage from './pages/ChildReportPage';
+import ChildTimelinePage from './pages/ChildTimelinePage';
 import BookAppointmentPage from './pages/BookAppointmentPage';
 import TherapistSchedulePage from './pages/TherapistSchedulePage';
 import ParentSchedulePage from './pages/ParentSchedulePage';
 import ChildSchedulePage from './pages/ChildSchedulePage';
 import AdminAppointmentsPage from './pages/AdminAppointmentsPage';
 import AdminSlotsPage from './pages/AdminSlotsPage';
+import AdminAssessmentsPage from './pages/AdminAssessmentsPage';
+import AssessmentConductPage from './pages/AssessmentConductPage';
+import AssessmentReportPage from './pages/AssessmentReportPage';
+import ResourceLibraryPage from './pages/ResourceLibraryPage';
+import ChildResourcesPage from './pages/ChildResourcesPage';
+import AdminBillingPage from './pages/AdminBillingPage';
+import ParentBillingPage from './pages/ParentBillingPage';
+import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import UsersListPage from './pages/UsersListPage';
 import UserFormPage from './pages/UserFormPage';
 
@@ -54,6 +63,7 @@ export default function App() {
             <Route path="/children/new" element={<ChildFormPage />} />
             <Route path="/children/:childId" element={<ChildDetailPage />} />
             <Route path="/children/:childId/edit" element={<ChildFormPage />} />
+            <Route path="/children/:childId/timeline" element={<ChildTimelinePage />} />
             <Route path="/children/:childId/sessions" element={<SessionsPage />} />
             <Route path="/children/:childId/sessions/new" element={<SessionFormPage />} />
             <Route path="/children/:childId/sessions/:sessionId" element={<SessionDetailPage />} />
@@ -62,10 +72,19 @@ export default function App() {
             <Route path="/children/:childId/report" element={<ChildReportPage />} />
             <Route path="/children/:childId/chat" element={<ChatPage />} />
             <Route path="/children/:childId/schedule" element={<ChildSchedulePage />} />
+            <Route path="/children/:childId/resources" element={<ChildResourcesPage />} />
+            <Route path="/resources" element={<ResourceLibraryPage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/appointments/book" element={<BookAppointmentPage />} />
             <Route path="/schedule" element={<TherapistSchedulePage />} />
             <Route path="/parent/schedule" element={<ParentSchedulePage />} />
+            <Route path="/billing" element={<ParentBillingPage />} />
+            <Route path="/billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
+            <Route path="/admin/billing" element={<AdminBillingPage />} />
+            <Route path="/admin/billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
+            <Route path="/admin/assessments" element={<AdminAssessmentsPage />} />
+            <Route path="/admin/assessments/conduct/:typeId" element={<AssessmentConductPage />} />
+            <Route path="/admin/assessments/:assessmentId/report" element={<AssessmentReportPage />} />
             <Route path="/admin/appointments" element={<AdminAppointmentsPage />} />
             <Route path="/admin/slots" element={<AdminSlotsPage />} />
             <Route path="/users" element={<UsersListPage />} />

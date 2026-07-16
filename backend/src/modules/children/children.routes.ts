@@ -3,6 +3,7 @@ import { body, param } from 'express-validator';
 import { authMiddleware } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import * as childrenController from './children.controller';
+import * as timelineController from '../timeline/timeline.controller';
 
 const router = Router();
 router.use(authMiddleware);
@@ -10,6 +11,12 @@ router.use(authMiddleware);
 router.get('/', childrenController.list);
 router.get('/therapy-centers', childrenController.listTherapyCenters);
 router.get('/therapy-plans', childrenController.listTherapyPlans);
+
+router.get(
+  '/:id/timeline',
+  validate([param('id').isUUID()]),
+  timelineController.getChildTimeline
+);
 
 router.get(
   '/:id',

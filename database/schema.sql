@@ -619,3 +619,160 @@ EXCEPTION
     ALTER TABLE therapy_embeddings ALTER COLUMN embedding TYPE vector(768);
 END $$;
 CREATE INDEX IF NOT EXISTS idx_therapy_embeddings_vector ON therapy_embeddings USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+
+-- ============== CHILD ASSESSMENTS & SCREENING ==============
+CREATE TABLE IF NOT EXISTS child_assessments (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id         UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  assessment_type  VARCHAR(64) NOT NULL,
+  assessed_at      DATE NOT NULL DEFAULT CURRENT_DATE,
+  assessor_id      UUID REFERENCES users(id) ON DELETE SET NULL,
+  respondent       VARCHAR(64),
+  responses        JSONB NOT NULL DEFAULT '{}',
+  scores           JSONB NOT NULL DEFAULT '{}',
+  interpretation   TEXT,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_child_assessments_child_id ON child_assessments(child_id);
+CREATE INDEX IF NOT EXISTS idx_child_assessments_type ON child_assessments(assessment_type);
+CREATE INDEX IF NOT EXISTS idx_child_assessments_assessed_at ON child_assessments(assessed_at DESC);
+
+DROP TRIGGER IF EXISTS child_assessments_updated_at ON child_assessments;
+CREATE TRIGGER child_assessments_updated_at BEFORE UPDATE ON child_assessments
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- ============== THERAPY RESOURCE LIBRARY ==============
+CREATE TABLE IF NOT EXISTS therapy_resources (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title        VARCHAR(500) NOT NULL,
+  description  TEXT,
+  category     VARCHAR(50) NOT NULL CHECK (category IN ('pdf', 'worksheet', 'visual_schedule', 'flashcard', 'social_story')),
+  file_url     TEXT,
+  file_name    VARCHAR(500),
+  mime_type    VARCHAR(128),
+  content      TEXT,
+  tags         TEXT[],
+  created_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_therapy_resources_category ON therapy_resources(category);
+CREATE INDEX IF NOT EXISTS idx_therapy_resources_created_at ON therapy_resources(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS child_resource_assignments (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id     UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  resource_id  UUID NOT NULL REFERENCES therapy_resources(id) ON DELETE CASCADE,
+  assigned_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  notes        TEXT,
+  assigned_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (child_id, resource_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_child_resource_assignments_child ON child_resource_assignments(child_id);
+CREATE INDEX IF NOT EXISTS idx_child_resource_assignments_resource ON child_resource_assignments(resource_id);
+
+DROP TRIGGER IF EXISTS therapy_resources_updated_at ON therapy_resources;
+CREATE TRIGGER therapy_resources_updated_at BEFORE UPDATE ON therapy_resources
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- ============== BILLING & INVOICING ==============
+CREATE TABLE IF NOT EXISTS therapy_packages (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name           VARCHAR(200) NOT NULL,
+  description    TEXT,
+  session_count  INTEGER NOT NULL CHECK (session_count > 0),
+  price_cents    INTEGER NOT NULL CHECK (price_cents >= 0),
+  currency       VARCHAR(3) NOT NULL DEFAULT 'AED',
+  is_active      BOOLEAN NOT NULL DEFAULT true,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS subscription_plans (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name              VARCHAR(200) NOT NULL,
+  description       TEXT,
+  interval_months   INTEGER NOT NULL DEFAULT 1 CHECK (interval_months > 0),
+  price_cents       INTEGER NOT NULL CHECK (price_cents >= 0),
+  sessions_included INTEGER,
+  currency          VARCHAR(3) NOT NULL DEFAULT 'AED',
+  is_active         BOOLEAN NOT NULL DEFAULT true,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS child_packages (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id            UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  package_id          UUID NOT NULL REFERENCES therapy_packages(id) ON DELETE RESTRICT,
+  sessions_total      INTEGER NOT NULL,
+  sessions_remaining  INTEGER NOT NULL,
+  amount_cents        INTEGER NOT NULL,
+  currency            VARCHAR(3) NOT NULL DEFAULT 'AED',
+  status              VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
+  purchased_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at          DATE,
+  assigned_by         UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS child_subscriptions (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id           UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  plan_id            UUID NOT NULL REFERENCES subscription_plans(id) ON DELETE RESTRICT,
+  amount_cents       INTEGER NOT NULL,
+  currency           VARCHAR(3) NOT NULL DEFAULT 'AED',
+  status             VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'cancelled')),
+  started_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  next_billing_date  DATE,
+  assigned_by        UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  child_id        UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  invoice_number  VARCHAR(32) NOT NULL UNIQUE,
+  title           VARCHAR(500) NOT NULL,
+  invoice_type    VARCHAR(32) NOT NULL DEFAULT 'manual' CHECK (invoice_type IN ('session', 'package', 'subscription', 'manual')),
+  amount_cents    INTEGER NOT NULL CHECK (amount_cents >= 0),
+  currency        VARCHAR(3) NOT NULL DEFAULT 'AED',
+  status          VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled')),
+  due_date        DATE,
+  paid_at         TIMESTAMPTZ,
+  session_id      UUID REFERENCES sessions(id) ON DELETE SET NULL,
+  package_id      UUID REFERENCES therapy_packages(id) ON DELETE SET NULL,
+  plan_id         UUID REFERENCES subscription_plans(id) ON DELETE SET NULL,
+  notes           TEXT,
+  created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS invoice_payments (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  invoice_id      UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  amount_cents    INTEGER NOT NULL,
+  payment_method  VARCHAR(64) DEFAULT 'manual',
+  reference       VARCHAR(200),
+  paid_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoices_child_id ON invoices(child_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_session_id ON invoices(session_id);
+CREATE INDEX IF NOT EXISTS idx_child_packages_child ON child_packages(child_id);
+CREATE INDEX IF NOT EXISTS idx_child_subscriptions_child ON child_subscriptions(child_id);
+
+DROP TRIGGER IF EXISTS therapy_packages_updated_at ON therapy_packages;
+CREATE TRIGGER therapy_packages_updated_at BEFORE UPDATE ON therapy_packages
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS subscription_plans_updated_at ON subscription_plans;
+CREATE TRIGGER subscription_plans_updated_at BEFORE UPDATE ON subscription_plans
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+DROP TRIGGER IF EXISTS invoices_updated_at ON invoices;
+CREATE TRIGGER invoices_updated_at BEFORE UPDATE ON invoices
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();

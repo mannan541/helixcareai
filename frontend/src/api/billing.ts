@@ -1,0 +1,184 @@
+import { api } from './client';
+
+export type TherapyPackage = {
+  id: string;
+  name: string;
+  description: string | null;
+  sessionCount: number;
+  priceCents: number;
+  currency: string;
+  isActive: boolean;
+};
+
+export type SubscriptionPlan = {
+  id: string;
+  name: string;
+  description: string | null;
+  intervalMonths: number;
+  priceCents: number;
+  sessionsIncluded: number | null;
+  currency: string;
+  isActive: boolean;
+};
+
+export type Invoice = {
+  id: string;
+  childId: string;
+  invoiceNumber: string;
+  title: string;
+  invoiceType: string;
+  amountCents: number;
+  currency: string;
+  status: string;
+  dueDate: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  childName?: string;
+  childCode?: string | null;
+  notes?: string | null;
+  sessionId?: string | null;
+  packageId?: string | null;
+  planId?: string | null;
+  packageName?: string | null;
+  planName?: string | null;
+  sessionDate?: string | null;
+  sessionDurationMinutes?: number | null;
+};
+
+export type InvoicePayment = {
+  id: string;
+  amountCents: number;
+  paymentMethod: string | null;
+  reference: string | null;
+  paidAt: string;
+};
+
+export type ChildBillingAccount = {
+  childId: string;
+  childName: string;
+  childCode: string | null;
+  outstandingCents: number;
+  paidCents: number;
+  currency: string;
+  activePackages: {
+    id: string;
+    packageName: string;
+    sessionsRemaining: number;
+    sessionsTotal: number;
+    status: string;
+  }[];
+  activeSubscriptions: {
+    id: string;
+    planName: string;
+    nextBillingDate: string | null;
+    status: string;
+    amountCents: number;
+  }[];
+  invoices: Invoice[];
+};
+
+export async function getParentBilling(): Promise<{
+  accounts: ChildBillingAccount[];
+  totalOutstandingCents: number;
+  totalPaidCents: number;
+}> {
+  const { data } = await api.get('/api/billing/my-account');
+  return data;
+}
+
+export async function getChildBilling(childId: string): Promise<ChildBillingAccount> {
+  const { data } = await api.get(`/api/billing/child/${childId}`);
+  return data.account;
+}
+
+export async function getOutstanding(): Promise<{
+  outstanding: { childId: string; childName: string; outstandingCents: number; currency: string; invoiceCount: number }[];
+  totalOutstandingCents: number;
+}> {
+  const { data } = await api.get('/api/billing/outstanding');
+  return data;
+}
+
+export async function listPackages(): Promise<TherapyPackage[]> {
+  const { data } = await api.get<{ packages: TherapyPackage[] }>('/api/billing/packages');
+  return data.packages;
+}
+
+export async function createPackage(input: {
+  name: string;
+  description?: string;
+  sessionCount: number;
+  priceCents: number;
+}): Promise<TherapyPackage> {
+  const { data } = await api.post<{ package: TherapyPackage }>('/api/billing/packages', input);
+  return data.package;
+}
+
+export async function updatePackage(id: string, input: Partial<TherapyPackage>): Promise<TherapyPackage> {
+  const { data } = await api.patch<{ package: TherapyPackage }>(`/api/billing/packages/${id}`, {
+    name: input.name,
+    description: input.description,
+    sessionCount: input.sessionCount,
+    priceCents: input.priceCents,
+    isActive: input.isActive,
+  });
+  return data.package;
+}
+
+export async function listPlans(): Promise<SubscriptionPlan[]> {
+  const { data } = await api.get<{ plans: SubscriptionPlan[] }>('/api/billing/plans');
+  return data.plans;
+}
+
+export async function createPlan(input: {
+  name: string;
+  description?: string;
+  intervalMonths: number;
+  priceCents: number;
+  sessionsIncluded?: number;
+}): Promise<SubscriptionPlan> {
+  const { data } = await api.post<{ plan: SubscriptionPlan }>('/api/billing/plans', input);
+  return data.plan;
+}
+
+export async function listInvoices(params?: { childId?: string; status?: string }): Promise<Invoice[]> {
+  const { data } = await api.get<{ invoices: Invoice[] }>('/api/billing/invoices', { params });
+  return data.invoices;
+}
+
+export async function getInvoice(id: string): Promise<{ invoice: Invoice; payments: InvoicePayment[] }> {
+  const { data } = await api.get<{ invoice: Invoice; payments: InvoicePayment[] }>(`/api/billing/invoices/${id}`);
+  return data;
+}
+
+export async function payInvoice(id: string, paymentMethod?: string): Promise<Invoice> {
+  const { data } = await api.post<{ invoice: Invoice }>(`/api/billing/invoices/${id}/pay`, { paymentMethod });
+  return data.invoice;
+}
+
+export async function billSession(input: {
+  childId: string;
+  sessionId: string;
+  amountCents?: number;
+}): Promise<Invoice> {
+  const { data } = await api.post<{ invoice: Invoice }>('/api/billing/session-bill', input);
+  return data.invoice;
+}
+
+export async function assignPackage(childId: string, packageId: string): Promise<Invoice> {
+  const { data } = await api.post<{ invoice?: Invoice }>(`/api/billing/child/${childId}/package`, { packageId });
+  if (!data.invoice) throw new Error('Invoice was not created');
+  return data.invoice;
+}
+
+export async function assignSubscription(childId: string, planId: string): Promise<Invoice> {
+  const { data } = await api.post<{ invoice: Invoice }>(`/api/billing/child/${childId}/subscription`, { planId });
+  return data.invoice;
+}
+
+export async function listUnbilledSessions(childId?: string): Promise<
+  { id: string; childId: string; childName: string; sessionDate: string; durationMinutes: number | null }[]
+> {
+  const { data } = await api.get('/api/billing/unbilled-sessions', { params: { childId } });
+  return data.sessions;
+}

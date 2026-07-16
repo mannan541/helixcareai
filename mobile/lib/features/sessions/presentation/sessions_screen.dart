@@ -8,6 +8,8 @@ import 'package:helixcareai_mobile/features/children/domain/child_entity.dart';
 import 'package:helixcareai_mobile/features/sessions/presentation/sessions_bloc.dart';
 import 'package:helixcareai_mobile/features/sessions/presentation/session_form_screen.dart';
 import 'package:helixcareai_mobile/features/sessions/presentation/session_detail_screen.dart';
+import 'package:helixcareai_mobile/core/utils/session_metrics.dart';
+import 'package:helixcareai_mobile/core/widgets/session_metrics_display.dart';
 
 class SessionsScreen extends StatelessWidget {
   const SessionsScreen({super.key, this.showAppBar = true});
@@ -59,6 +61,7 @@ class _SessionsViewState extends State<_SessionsView> {
   bool? _canEdit;
   bool? _canDeleteSession;
   String? _currentUserId;
+  bool _isParent = false;
 
   @override
   void initState() {
@@ -68,6 +71,7 @@ class _SessionsViewState extends State<_SessionsView> {
         _canEdit = user?.isAdmin ?? false; // only admin can edit broadly; therapist check per-session below
         _canDeleteSession = user?.isAdmin ?? false;
         _currentUserId = user?.id;
+        _isParent = user?.isParent ?? false;
       });
     });
   }
@@ -143,6 +147,8 @@ class _SessionsViewState extends State<_SessionsView> {
                     );
                   }
                   final s = list[i];
+                  final metrics = s.structuredMetrics;
+                  final preview = _sessionPreview(s, _isParent);
                   final isMySession = _currentUserId != null &&
                       s.therapistUser != null &&
                       s.therapistUser!.id == _currentUserId;
@@ -176,19 +182,27 @@ class _SessionsViewState extends State<_SessionsView> {
                           Text(
                             [
                               if (s.durationMinutes != null) '${s.durationMinutes} min',
-                              if (s.notesText != null && s.notesText!.isNotEmpty) s.notesText,
-                            ].join(' • '),
+                              if (metrics['therapyTitle'] != null) metrics['therapyTitle'].toString(),
+                              if (s.therapistUser != null && !isMySession) 'by ${s.therapistUser!.fullName}',
+                            ].whereType<String>().join(' • '),
                           ),
-                          if (s.therapistUser != null && !isMySession)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                'Conducted by ${s.therapistUser!.fullName}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
+                          if (getSessionMetricEntries(metrics).isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            SessionMetricsDisplay(
+                              metrics: metrics,
+                              audience: _isParent ? 'parent' : 'therapist',
+                              compact: true,
                             ),
+                          ],
+                          if (preview != null && preview.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              preview,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ],
                       ),
                       trailing: Row(
@@ -275,6 +289,14 @@ class _SessionsViewState extends State<_SessionsView> {
     if (confirm != true || !mounted) return;
     context.read<SessionsBloc>().add(SessionDeleteRequested(session.id));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Delete request sent')));
+  }
+
+  String? _sessionPreview(SessionEntity s, bool isParent) {
+    final m = s.structuredMetrics;
+    final parentSummary = m['parentSummary']?.toString().trim() ?? '';
+    if (parentSummary.isNotEmpty) return parentSummary;
+    if (isParent) return null;
+    return s.notesText?.trim();
   }
 
   void _openSessionForm(BuildContext context, SessionEntity? session) {

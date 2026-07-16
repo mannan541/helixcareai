@@ -23,7 +23,9 @@ import {
   ConfirmDialog,
 } from '../components/ui';
 import BackButton from '../components/BackButton';
-import { formatDate, formatDateTime, sessionMetricLabel } from '../utils/format';
+import { formatDate, formatDateTime } from '../utils/format';
+import SessionMetricsDisplay from '../components/SessionMetricsDisplay';
+import { getSessionMetricEntries } from '../utils/sessionMetrics';
 
 export default function SessionDetailPage() {
   const { childId, sessionId } = useParams<{ childId: string; sessionId: string }>();
@@ -66,7 +68,13 @@ export default function SessionDetailPage() {
   const metrics = session.structuredMetrics ?? {};
   const therapy = metrics.therapyTitle as string | undefined;
   const timeSlot = metrics.timeSlot as string | undefined;
-  const metricEntries = Object.entries(metrics).filter(([k]) => k !== 'therapyTitle' && k !== 'timeSlot');
+  const parentSummary = String(metrics.parentSummary ?? '').trim();
+  const progressUpdate = String(metrics.progressUpdate ?? '').trim();
+  const homeRecommendations = String(metrics.homeRecommendations ?? '').trim();
+  const hasParentUpdate = Boolean(parentSummary || progressUpdate || homeRecommendations);
+  const isParent = user?.role === 'parent';
+  const metricEntries = getSessionMetricEntries(metrics);
+  const metricsAudience = isParent ? 'parent' : user?.role === 'therapist' ? 'therapist' : 'admin';
   const canEdit = user?.role === 'admin' || user?.role === 'therapist';
   const isAdmin = user?.role === 'admin';
   // Mirrors mobile app rule: a therapist cannot comment on their own session.
@@ -154,25 +162,54 @@ export default function SessionDetailPage() {
 
       {metricEntries.length > 0 && (
         <Card>
-          <h2 className="mb-2 font-bold">Metrics</h2>
-          <div className="flex flex-wrap gap-2">
-            {metricEntries.map(([k, v]) => (
-              <span key={k} className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm">
-                <span className="text-slate-600">{sessionMetricLabel(k)}</span>: <b>{String(v)}</b>
-              </span>
-            ))}
+          <h2 className="mb-2 font-bold">{isParent ? 'Session progress' : 'Session metrics'}</h2>
+          {isParent && (
+            <p className="mb-3 text-xs text-slate-500">Scores are shown out of 10 for easy progress tracking.</p>
+          )}
+          <SessionMetricsDisplay
+            metrics={metrics}
+            audience={metricsAudience}
+            variant={isParent ? 'detailed' : 'detailed'}
+          />
+        </Card>
+      )}
+
+      {hasParentUpdate && (
+        <Card>
+          <h2 className="mb-3 font-bold text-primary-dark">Session update for parents</h2>
+          <div className="space-y-4">
+            {parentSummary && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Summary</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{parentSummary}</p>
+              </div>
+            )}
+            {progressUpdate && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{progressUpdate}</p>
+              </div>
+            )}
+            {homeRecommendations && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">At home</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{homeRecommendations}</p>
+              </div>
+            )}
           </div>
         </Card>
       )}
 
-      <Card>
-        <h2 className="mb-2 font-bold">Therapist notes</h2>
-        {session.notesText ? (
-          <p className="whitespace-pre-wrap text-sm text-slate-700">{session.notesText}</p>
-        ) : (
-          <p className="text-sm text-slate-500">No notes recorded</p>
-        )}
-      </Card>
+      {(!isParent || !hasParentUpdate) && (
+        <Card>
+          <h2 className="mb-2 font-bold">Therapist notes {isParent ? '' : '(clinical)'}</h2>
+          {session.notesText ? (
+            <p className="whitespace-pre-wrap text-sm text-slate-700">{session.notesText}</p>
+          ) : (
+            <p className="text-sm text-slate-500">No notes recorded</p>
+          )}
+        </Card>
+      )}
 
       <Card>
         <h2 className="mb-3 font-bold">Comments ({comments.length})</h2>

@@ -9,15 +9,17 @@ import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Card, Field, inputCls, btnPrimary, btnSecondary, PageTitle, Spinner, ErrorMessage } from '../components/ui';
 import BackButton from '../components/BackButton';
-import { formatTime, todayInput, toDateInput, sessionMetricLabel } from '../utils/format';
+import { convertTherapistNotes } from '../api/ai';
+import { formatTime, todayInput, toDateInput } from '../utils/format';
+import {
+  CORE_SESSION_METRICS,
+  ADDITIONAL_SESSION_METRICS,
+  buildStoredMetricsFromPickers,
+  loadPickerValuesFromMetrics,
+} from '../utils/sessionMetrics';
+import MetricScalePicker, { MetricScaleLegend } from '../components/MetricScalePicker';
 
 const THERAPY_TITLES = ['Speech', 'Behaviour', 'Occupational'] as const;
-
-const DEFAULT_METRICS = [
-  { key: 'engagement', label: 'Engagement' },
-  { key: 'focus', label: 'Focus' },
-  { key: 'communication', label: 'Communication' },
-] as const;
 
 const DEFAULT_TIME_SLOT = '12:15 PM - 01:00 PM';
 
@@ -51,7 +53,7 @@ function formatAppointmentTimeSlot(startTime: string, endTime: string): string {
   return `${formatTime(startTime)} - ${formatTime(endTime)}`;
 }
 
-type MetricValues = Record<string, string>;
+type MetricPickers = Record<string, number | ''>;
 
 export default function SessionFormPage() {
   const { childId, sessionId } = useParams<{ childId: string; sessionId?: string }>();
@@ -76,11 +78,14 @@ export default function SessionFormPage() {
   const [timeSlot, setTimeSlot] = useState(DEFAULT_TIME_SLOT);
   const [therapistId, setTherapistId] = useState('');
   const [notes, setNotes] = useState('');
-  const [metricValues, setMetricValues] = useState<MetricValues>({
-    engagement: '5',
-    focus: '5',
-    communication: '5',
-  });
+  const [metricPickers, setMetricPickers] = useState<MetricPickers>(() =>
+    loadPickerValuesFromMetrics({})
+  );
+  const [showAdditionalMetrics, setShowAdditionalMetrics] = useState(false);
+  const [parentSummary, setParentSummary] = useState('');
+  const [progressUpdate, setProgressUpdate] = useState('');
+  const [homeRecommendations, setHomeRecommendations] = useState('');
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     if (!childId) return;
@@ -105,11 +110,14 @@ export default function SessionFormPage() {
             (m.therapyTitle as string) ?? therapyFromTherapistTitle(s.therapistUser?.title) ?? null
           );
           setTimeSlot((m.timeSlot as string) ?? DEFAULT_TIME_SLOT);
-          setMetricValues({
-            engagement: String(m.engagement ?? '5'),
-            focus: String(m.focus ?? '5'),
-            communication: String(m.communication ?? '5'),
-          });
+          const loaded = loadPickerValuesFromMetrics(m);
+          setMetricPickers(loaded);
+          setShowAdditionalMetrics(
+            ADDITIONAL_SESSION_METRICS.some((k) => loaded[k] !== '')
+          );
+          setParentSummary(String(m.parentSummary ?? ''));
+          setProgressUpdate(String(m.progressUpdate ?? ''));
+          setHomeRecommendations(String(m.homeRecommendations ?? ''));
         } else {
           // New session defaults
           let initialTherapistId = '';
@@ -182,6 +190,34 @@ export default function SessionFormPage() {
     }
   };
 
+  const generateParentUpdate = async () => {
+    if (!childId || !notes.trim()) {
+      setError('Add therapist notes first, then generate a parent-friendly update.');
+      return;
+    }
+    setError('');
+    setGenerating(true);
+    try {
+      const structuredMetrics: Record<string, unknown> = {
+        ...buildStoredMetricsFromPickers(metricPickers),
+      };
+      if (therapyTitle) structuredMetrics.therapyTitle = therapyTitle;
+      const result = await convertTherapistNotes({
+        childId,
+        notesText: notes.trim(),
+        therapyTitle,
+        structuredMetrics,
+      });
+      setParentSummary(result.parentSummary);
+      setProgressUpdate(result.progressUpdate);
+      setHomeRecommendations(result.homeRecommendations);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const insertBullet = () => {
     const el = notesRef.current;
     if (!el) return;
@@ -201,16 +237,14 @@ export default function SessionFormPage() {
     e.preventDefault();
     setError('');
     setBusy(true);
-    const structuredMetrics: Record<string, unknown> = {};
+    const structuredMetrics: Record<string, unknown> = {
+      ...buildStoredMetricsFromPickers(metricPickers),
+    };
     if (therapyTitle) structuredMetrics.therapyTitle = therapyTitle;
     if (timeSlot.trim()) structuredMetrics.timeSlot = timeSlot.trim();
-    for (const { key } of DEFAULT_METRICS) {
-      const v = metricValues[key]?.trim();
-      if (v) {
-        const n = Number(v);
-        structuredMetrics[key] = isNaN(n) ? v : n;
-      }
-    }
+    if (parentSummary.trim()) structuredMetrics.parentSummary = parentSummary.trim();
+    if (progressUpdate.trim()) structuredMetrics.progressUpdate = progressUpdate.trim();
+    if (homeRecommendations.trim()) structuredMetrics.homeRecommendations = homeRecommendations.trim();
     try {
       if (isEdit && sessionId) {
         await updateSession(sessionId, {
@@ -344,66 +378,122 @@ export default function SessionFormPage() {
           </div>
         </Card>
 
-        <Card>
-          <h2 className="mb-3 font-bold">Structured metrics</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {DEFAULT_METRICS.map(({ key, label }) => (
-              <Field key={key} label={label}>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  className={inputCls}
-                  placeholder="1-10 or value"
-                  value={metricValues[key] ?? ''}
-                  onChange={(e) =>
-                    setMetricValues((prev) => ({ ...prev, [key]: e.target.value }))
-                  }
-                />
-              </Field>
+        <Card className="space-y-4">
+          <div>
+            <h2 className="font-bold text-slate-900">Session metrics</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Rate each area 1–5 after the session. Scores are saved as 0–10 for parent reports and progress charts.
+            </p>
+          </div>
+          <MetricScaleLegend />
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-slate-800">Core metrics</p>
+            {CORE_SESSION_METRICS.map((key) => (
+              <MetricScalePicker
+                key={key}
+                metricKey={key}
+                value={metricPickers[key] ?? 3}
+                onChange={(v) => setMetricPickers((prev) => ({ ...prev, [key]: v === '' ? 3 : v }))}
+              />
             ))}
           </div>
-          {/* Show any extra metrics from edit mode not in defaults */}
-          {isEdit &&
-            Object.entries(metricValues)
-              .filter(([k]) => !DEFAULT_METRICS.some((m) => m.key === k))
-              .map(([key, value]) => (
-                <div key={key} className="mt-3">
-                  <Field label={sessionMetricLabel(key)}>
-                    <input
-                      className={inputCls}
-                      value={value}
-                      onChange={(e) =>
-                        setMetricValues((prev) => ({ ...prev, [key]: e.target.value }))
-                      }
-                    />
-                  </Field>
-                </div>
+          <button
+            type="button"
+            className="text-sm font-semibold text-primary hover:underline"
+            onClick={() => setShowAdditionalMetrics((v) => !v)}
+          >
+            {showAdditionalMetrics ? '− Hide additional clinical metrics' : '+ Additional clinical metrics (optional)'}
+          </button>
+          {showAdditionalMetrics && (
+            <div className="space-y-3 border-t border-slate-200 pt-4">
+              <p className="text-xs text-slate-500">
+                Especially useful for ADHD/ASD tracking: instructions, social skills, regulation, and more.
+              </p>
+              {ADDITIONAL_SESSION_METRICS.map((key) => (
+                <MetricScalePicker
+                  key={key}
+                  metricKey={key}
+                  value={metricPickers[key] ?? ''}
+                  optional
+                  onChange={(v) => setMetricPickers((prev) => ({ ...prev, [key]: v }))}
+                />
               ))}
+            </div>
+          )}
         </Card>
 
         <Card>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-bold text-slate-900">Therapist notes (free text)</span>
-            <button
-              type="button"
-              onClick={insertBullet}
-              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-              title="Add bullet point"
-              aria-label="Add bullet point"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M4 10.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm0-6c-.83 0-1.5.67-1.5 1.5S3.17 7.5 4 7.5 5.5 6.83 5.5 6 4.83 4.5 4 4.5zm0 12c-.83 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5 1.5-.68 1.5-1.5-.67-1.5-1.5-1.5zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z" />
-              </svg>
-            </button>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-bold text-slate-900">Therapist notes (clinical)</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={insertBullet}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                title="Add bullet point"
+                aria-label="Add bullet point"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4 10.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm0-6c-.83 0-1.5.67-1.5 1.5S3.17 7.5 4 7.5 5.5 6.83 5.5 6 4.83 4.5 4 4.5zm0 12c-.83 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5 1.5-.68 1.5-1.5-.67-1.5-1.5-1.5zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z" />
+                </svg>
+              </button>
+            </div>
           </div>
+          <p className="mb-2 text-xs text-slate-500">
+            Write clinical notes here (e.g. receptive language, visual prompts). Use AI below to create a parent-friendly version.
+          </p>
           <textarea
             ref={notesRef}
             className={`${inputCls} min-h-32`}
-            placeholder="Therapist notes..."
+            placeholder="Worked on receptive language and visual prompts..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
+        </Card>
+
+        <Card>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-bold text-slate-900">Parent-friendly update</h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                AI converts clinical notes into plain language for parents.
+              </p>
+            </div>
+            <button
+              type="button"
+              className={btnSecondary}
+              onClick={generateParentUpdate}
+              disabled={generating || !notes.trim()}
+            >
+              {generating ? 'Generating…' : 'Generate with AI'}
+            </button>
+          </div>
+          <div className="space-y-4">
+            <Field label="Parent-friendly summary">
+              <textarea
+                className={`${inputCls} min-h-24`}
+                placeholder="Today Ahmed responded better to visual cues..."
+                value={parentSummary}
+                onChange={(e) => setParentSummary(e.target.value)}
+              />
+            </Field>
+            <Field label="Progress update">
+              <textarea
+                className={`${inputCls} min-h-20`}
+                placeholder="What improved or was observed this session..."
+                value={progressUpdate}
+                onChange={(e) => setProgressUpdate(e.target.value)}
+              />
+            </Field>
+            <Field label="Home recommendations">
+              <textarea
+                className={`${inputCls} min-h-20`}
+                placeholder="Continue using picture cards at home..."
+                value={homeRecommendations}
+                onChange={(e) => setHomeRecommendations(e.target.value)}
+              />
+            </Field>
+          </div>
         </Card>
 
         <div className="flex gap-2">

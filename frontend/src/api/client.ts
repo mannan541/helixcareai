@@ -27,6 +27,10 @@ export function setOnUnauthorized(cb: () => void): void {
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Let the browser set multipart boundary — a manual Content-Type breaks file uploads.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
@@ -55,6 +59,17 @@ export function errorMessage(err: unknown): string {
       return data.errors
         .map((e) => (e.path ? `${e.path}: ${e.msg ?? 'invalid'}` : e.msg ?? 'Invalid value'))
         .join('\n');
+    }
+    if (err.response?.status === 413) {
+      return data?.error ?? 'File is too large. Maximum upload size is 4 MB.';
+    }
+    if (err.response?.status === 404) {
+      const body = err.response.data;
+      const isHtml = typeof body === 'string' && body.toLowerCase().includes('<!doctype');
+      if (isHtml) {
+        return 'Upload API not found. Hard-refresh the page (Cmd+Shift+R) and try again.';
+      }
+      return data?.error ?? `Not found (${err.config?.url ?? 'unknown path'})`;
     }
     if (err.code === 'ERR_NETWORK') {
       return 'Cannot reach the API. Is the backend running?';

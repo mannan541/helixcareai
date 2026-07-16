@@ -5,6 +5,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/utils/date_format.dart';
 import '../../children/domain/child_entity.dart';
 import '../data/reports_repository.dart';
+import '../../../core/utils/session_metrics.dart';
 
 class ChildReportScreen extends StatefulWidget {
   const ChildReportScreen({super.key});
@@ -178,16 +179,25 @@ class _ChildReportScreenState extends State<ChildReportScreen> {
                 _statRow('Attendance rate', '${_report!.attendance.attendanceRate}%'),
             ]),
             const SizedBox(height: 16),
-            _sectionTitle('Performance'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _sectionTitle('Performance'),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pushNamed('/analytics', arguments: child),
+                  child: const Text('View charts'),
+                ),
+              ],
+            ),
             _statCard([
               _statRow('Sessions logged', '${_report!.performance.totalSessions}'),
               _statRow('Total minutes', '${_report!.performance.totalMinutes}'),
               if (_report!.performance.avgEngagement != null)
-                _statRow('Avg engagement', '${_report!.performance.avgEngagement}'),
+                _statRow('Avg engagement', formatMetricForParent(_report!.performance.avgEngagement)),
               if (_report!.performance.avgFocus != null)
-                _statRow('Avg focus', '${_report!.performance.avgFocus}'),
+                _statRow('Avg focus', formatMetricForParent(_report!.performance.avgFocus)),
               if (_report!.performance.avgCommunication != null)
-                _statRow('Avg communication', '${_report!.performance.avgCommunication}'),
+                _statRow('Avg communication', formatMetricForParent(_report!.performance.avgCommunication)),
             ]),
             if (_report!.performance.trend.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -198,7 +208,7 @@ class _ChildReportScreenState extends State<ChildReportScreen> {
                 children: _report!.performance.trend.entries
                     .where((e) => e.value != null)
                     .map((e) => Chip(
-                          label: Text('${e.key}: ${e.value! > 0 ? '+' : ''}${e.value}'),
+                          label: Text('${e.key}: ${e.value! > 0 ? '+' : ''}${e.value} pts'),
                           visualDensity: VisualDensity.compact,
                         ))
                     .toList(),
@@ -222,10 +232,15 @@ class _ChildReportScreenState extends State<ChildReportScreen> {
                       subtitle: Text([
                         if (s.therapyTitle != null) s.therapyTitle,
                         if (s.durationMinutes != null) '${s.durationMinutes} min',
-                        if (s.engagement != null) 'Eng: ${s.engagement}',
-                        if (s.focus != null) 'Focus: ${s.focus}',
-                        if (s.communication != null) 'Comm: ${s.communication}',
+                        if (s.engagement != null) 'Eng: ${formatMetricForParent(s.engagement)}',
+                        if (s.focus != null) 'Focus: ${formatMetricForParent(s.focus)}',
+                        if (s.communication != null) 'Comm: ${formatMetricForParent(s.communication)}',
                       ].whereType<String>().join(' · ')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).pushNamed('/session_detail', arguments: {
+                        'sessionId': s.id,
+                        'childId': child.id,
+                      }),
                     ),
                   )),
             ],

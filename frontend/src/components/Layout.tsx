@@ -13,12 +13,17 @@ function navItemsFor(role: string): NavItem[] {
   ];
   if (role === 'admin') {
     items.push({ to: '/users', label: 'Users', icon: '👥' });
+    items.push({ to: '/admin/assessments', label: 'Assessments', icon: '📊' });
+    items.push({ to: '/admin/billing', label: 'Billing', icon: '💳' });
+    items.push({ to: '/resources', label: 'Resource Library', icon: '📚' });
     items.push({ to: '/admin/appointments', label: 'Appointments', icon: '📅' });
     items.push({ to: '/admin/slots', label: 'Manage Slots', icon: '🕒' });
   } else if (role === 'therapist') {
+    items.push({ to: '/resources', label: 'Resource Library', icon: '📚' });
     items.push({ to: '/schedule', label: 'My Schedule', icon: '📅' });
   } else {
     items.push({ to: '/parent/schedule', label: 'My Schedule', icon: '📅' });
+    items.push({ to: '/billing', label: 'Billing', icon: '💳' });
     items.push({ to: '/appointments/book', label: 'Book Appointment', icon: '➕' });
   }
   items.push({ to: '/chat', label: 'AI Assistant', icon: '💬' });
@@ -63,32 +68,32 @@ export default function Layout() {
   );
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-dvh overflow-hidden">
       {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-4">
+      <aside className="hidden h-full w-60 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white md:flex">
+        <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-4">
           <span className="text-2xl">🩺</span>
           <span className="text-lg font-bold text-primary-dark">HelixCareAI</span>
         </div>
-        {nav}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{nav}</div>
       </aside>
 
       {/* Mobile drawer */}
       {menuOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-64 bg-white shadow-xl">
-            <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-4">
+          <aside className="absolute left-0 top-0 flex h-full w-64 flex-col overflow-hidden bg-white shadow-xl">
+            <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-4">
               <span className="text-2xl">🩺</span>
               <span className="text-lg font-bold text-primary-dark">HelixCareAI</span>
             </div>
-            {nav}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{nav}</div>
           </aside>
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               className="rounded-lg p-1.5 text-xl hover:bg-slate-100 md:hidden"
@@ -131,7 +136,7 @@ export default function Layout() {
             </button>
           </div>
         </header>
-        <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
           <div className="mx-auto max-w-5xl">
             <Outlet />
           </div>

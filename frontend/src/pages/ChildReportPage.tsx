@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getChildReport, getChildReportCsv } from '../api/reports';
 import { getChild } from '../api/children';
 import type { Child, ChildReport } from '../api/types';
@@ -17,6 +17,7 @@ import {
 } from '../components/ui';
 import BackButton from '../components/BackButton';
 import { formatDate, formatTime, toDateInput, todayInput } from '../utils/format';
+import { formatMetricForParent } from '../utils/sessionMetrics';
 
 function Stat({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {
   return (
@@ -29,6 +30,7 @@ function Stat({ label, value, accent }: { label: string; value: string | number;
 
 export default function ChildReportPage() {
   const { childId } = useParams<{ childId: string }>();
+  const navigate = useNavigate();
   const [child, setChild] = useState<Child | null>(null);
   const defaultFrom = () => {
     const d = new Date();
@@ -131,7 +133,16 @@ export default function ChildReportPage() {
             </Card>
 
             <Card>
-              <h2 className="mb-2 font-bold">Performance averages</h2>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="font-bold">Performance averages</h2>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-primary hover:underline"
+                  onClick={() => childId && navigate(`/children/${childId}/analytics`)}
+                >
+                  View charts →
+                </button>
+              </div>
               <div className="grid grid-cols-3 gap-2 text-sm">
                 {(
                   [
@@ -140,15 +151,21 @@ export default function ChildReportPage() {
                     ['Communication', report.performance.avgCommunication, report.performance.trend.communicationChange],
                   ] as const
                 ).map(([label, avg, change]) => (
-                  <div key={label}>
+                  <button
+                    key={label}
+                    type="button"
+                    className="rounded-lg p-2 text-left transition hover:bg-slate-50"
+                    onClick={() => childId && navigate(`/children/${childId}/analytics`)}
+                    title="Open performance charts"
+                  >
                     <p className="text-xs text-slate-500">{label}</p>
-                    <p className="text-lg font-bold">{avg ?? '—'}</p>
+                    <p className="text-lg font-bold">{avg != null ? formatMetricForParent(avg) : '—'}</p>
                     {change != null && (
                       <p className={`text-xs font-semibold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {change >= 0 ? '▲' : '▼'} {Math.abs(change)}
+                        {change >= 0 ? '▲' : '▼'} {Math.abs(change)} pts
                       </p>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             </Card>
@@ -174,13 +191,25 @@ export default function ChildReportPage() {
                   </thead>
                   <tbody>
                     {report.sessions.map((s) => (
-                      <tr key={s.id} className="border-b border-slate-100 last:border-0">
-                        <td className="py-2 pr-3 whitespace-nowrap">{formatDate(s.date)}</td>
+                      <tr
+                        key={s.id}
+                        className="cursor-pointer border-b border-slate-100 transition last:border-0 hover:bg-slate-50"
+                        onClick={() => childId && navigate(`/children/${childId}/sessions/${s.id}`)}
+                      >
+                        <td className="py-2 pr-3 whitespace-nowrap">
+                          <Link
+                            to={`/children/${childId}/sessions/${s.id}`}
+                            className="font-medium text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {formatDate(s.date)}
+                          </Link>
+                        </td>
                         <td className="py-2 pr-3">{s.therapyTitle ?? '—'}</td>
                         <td className="py-2 pr-3">{s.durationMinutes != null ? `${s.durationMinutes}m` : '—'}</td>
-                        <td className="py-2 pr-3">{s.engagement ?? '—'}</td>
-                        <td className="py-2 pr-3">{s.focus ?? '—'}</td>
-                        <td className="py-2 pr-3">{s.communication ?? '—'}</td>
+                        <td className="py-2 pr-3">{s.engagement != null ? formatMetricForParent(s.engagement) : '—'}</td>
+                        <td className="py-2 pr-3">{s.focus != null ? formatMetricForParent(s.focus) : '—'}</td>
+                        <td className="py-2 pr-3">{s.communication != null ? formatMetricForParent(s.communication) : '—'}</td>
                         <td className="max-w-60 truncate py-2 text-slate-500">{s.notesPreview ?? ''}</td>
                       </tr>
                     ))}

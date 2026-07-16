@@ -140,6 +140,7 @@ class ReportProgress {
 
 class ReportSession {
   ReportSession({
+    required this.id,
     required this.date,
     this.durationMinutes,
     this.therapyTitle,
@@ -149,6 +150,7 @@ class ReportSession {
     this.notesPreview,
   });
 
+  final String id;
   final String date;
   final int? durationMinutes;
   final String? therapyTitle;
@@ -158,6 +160,7 @@ class ReportSession {
   final String? notesPreview;
 
   factory ReportSession.fromJson(Map<String, dynamic> j) => ReportSession(
+        id: j['id'] as String,
         date: j['date'] as String,
         durationMinutes: j['durationMinutes'] as int?,
         therapyTitle: j['therapyTitle'] as String?,

@@ -44,12 +44,16 @@ export function todayInput(): string {
   return toDateInput(new Date());
 }
 
-const SESSION_METRIC_LABELS: Record<string, string> = {
-  engagement: 'Engagement',
-  focus: 'Focus',
-  communication: 'Communication',
-};
+export { sessionMetricLabel } from './sessionMetrics';
 
-export function sessionMetricLabel(key: string): string {
-  return SESSION_METRIC_LABELS[key] ?? (key ? key.charAt(0).toUpperCase() + key.slice(1) : key);
+/** Format amount stored in cents (e.g. 15000 → 150.00) */
+export function formatMoney(cents: number, _currency?: string): string {
+  const amount = cents / 100;
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Parse user input like "150" or "150.50" to cents */
+export function parseMoneyToCents(value: string): number {
+  const n = parseFloat(value.replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
 }

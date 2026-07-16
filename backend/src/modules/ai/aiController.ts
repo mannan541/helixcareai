@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as ragService from './ragService';
+import * as notesConversionService from './notesConversionService';
 import * as childrenService from '../children/children.service';
 
 export async function chat(req: Request, res: Response): Promise<void> {
@@ -30,6 +31,54 @@ export async function chat(req: Request, res: Response): Promise<void> {
     const err = e as Error & { statusCode?: number };
     const status = err.statusCode ?? 500;
     const message = err.message ?? 'AI chat request failed';
+    res.status(status).json({ error: message });
+  }
+}
+
+export async function convertNotes(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+  if (req.user.role === 'parent') {
+    res.status(403).json({ error: 'Only therapists and admins can convert session notes' });
+    return;
+  }
+
+  const { childId, notesText, therapyTitle, structuredMetrics } = req.body as {
+    childId: string;
+    notesText: string;
+    therapyTitle?: string;
+    structuredMetrics?: Record<string, unknown>;
+  };
+
+  if (!childId || typeof notesText !== 'string') {
+    res.status(400).json({ error: 'childId and notesText are required' });
+    return;
+  }
+
+  const child = await childrenService.findById(childId);
+  if (!child) {
+    res.status(404).json({ error: 'Child not found' });
+    return;
+  }
+  if (!childrenService.canAccessChild(child.user_id, req.user.userId, req.user.role)) {
+    res.status(403).json({ error: 'Access denied to this child' });
+    return;
+  }
+
+  try {
+    const result = await notesConversionService.convertTherapistNotes({
+      childId,
+      notesText,
+      therapyTitle,
+      structuredMetrics,
+    });
+    res.json(result);
+  } catch (e: unknown) {
+    const err = e as Error & { statusCode?: number };
+    const status = err.statusCode ?? 500;
+    const message = err.message ?? 'Failed to convert notes';
     res.status(status).json({ error: message });
   }
 }

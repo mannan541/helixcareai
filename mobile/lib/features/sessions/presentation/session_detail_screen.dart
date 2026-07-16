@@ -9,6 +9,8 @@ import '../../children/domain/child_entity.dart';
 import 'sessions_bloc.dart';
 import 'session_form_screen.dart';
 import '../../../core/widgets/linkable_text.dart';
+import '../../../core/utils/session_metrics.dart';
+import '../../../core/widgets/session_metrics_display.dart';
 
 class SessionDetailScreen extends StatefulWidget {
   const SessionDetailScreen({
@@ -40,13 +42,17 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   bool _loadingComments = true;
   bool _postingComment = false;
   String? _currentUserId;
+  String? _userRole;
   final _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     authRepository.me().then((u) {
-      if (mounted) setState(() => _currentUserId = u?.id);
+      if (mounted) setState(() {
+        _currentUserId = u?.id;
+        _userRole = u?.role;
+      });
     });
     _loadComments();
   }
@@ -197,6 +203,15 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
+    final metrics = s.structuredMetrics;
+    final isParent = _userRole == 'parent';
+    final metricAudience = isParent ? 'parent' : (_userRole == 'therapist' ? 'therapist' : 'admin');
+    final parentSummary = metrics['parentSummary']?.toString().trim() ?? '';
+    final progressUpdate = metrics['progressUpdate']?.toString().trim() ?? '';
+    final homeRecommendations = metrics['homeRecommendations']?.toString().trim() ?? '';
+    final hasParentUpdate = parentSummary.isNotEmpty || progressUpdate.isNotEmpty || homeRecommendations.isNotEmpty;
+    final showRawNotes = !isParent || !hasParentUpdate;
+    final metricEntries = getSessionMetricEntries(metrics);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Session'),
@@ -261,20 +276,46 @@ class _SessionDetailScreenState extends State<SessionDetailScreen> {
           const SizedBox(height: 16),
           Text('Session date: ${formatAppDate(s.sessionDate)}', style: Theme.of(context).textTheme.bodyMedium),
           if (s.durationMinutes != null) Text('Duration: ${s.durationMinutes} min', style: Theme.of(context).textTheme.bodyMedium),
-          if (s.notesText != null && s.notesText!.isNotEmpty) ...[
+          if (metricEntries.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(isParent ? 'Session progress' : 'Session metrics', style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (isParent) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Scores are shown out of 10 for easy progress tracking.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              ),
+            ],
+            const SizedBox(height: 8),
+            SessionMetricsDisplay(metrics: metrics, audience: metricAudience),
+          ],
+          if (hasParentUpdate) ...[
+            const SizedBox(height: 16),
+            const Text('Session update for parents', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (parentSummary.isNotEmpty) ...[
+              Text('SUMMARY', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              LinkableText(parentSummary, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 12),
+            ],
+            if (progressUpdate.isNotEmpty) ...[
+              Text('PROGRESS', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              LinkableText(progressUpdate, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 12),
+            ],
+            if (homeRecommendations.isNotEmpty) ...[
+              Text('AT HOME', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              LinkableText(homeRecommendations, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ],
+          if (showRawNotes && s.notesText != null && s.notesText!.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Text('Therapist Notes', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             LinkableText(s.notesText!, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-          if (s.structuredMetrics.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text('Structured metrics', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            ...s.structuredMetrics.entries.map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('${e.key}: ${e.value}', style: Theme.of(context).textTheme.bodyMedium),
-                )),
           ],
           const SizedBox(height: 24),
           const Text('Notes', style: TextStyle(fontWeight: FontWeight.bold)),

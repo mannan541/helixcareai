@@ -8,6 +8,19 @@ export function Spinner({ className = '' }: { className?: string }) {
   );
 }
 
+export function SuccessMessage({ message, onDismiss }: { message: string; onDismiss?: () => void }) {
+  return (
+    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+      <p className="whitespace-pre-wrap break-words">{message}</p>
+      {onDismiss && (
+        <button onClick={onDismiss} className="mt-2 font-medium text-green-900 underline">
+          Dismiss
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ErrorMessage({ error, onRetry }: { error: string; onRetry?: () => void }) {
   return (
     <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

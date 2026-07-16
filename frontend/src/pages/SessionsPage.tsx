@@ -7,7 +7,20 @@ import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Card, Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary } from '../components/ui';
 import BackButton from '../components/BackButton';
-import { formatDate, sessionMetricLabel } from '../utils/format';
+import { formatDate } from '../utils/format';
+import {
+  CORE_SESSION_METRICS,
+  formatMetricDisplay,
+  sessionMetricLabel,
+} from '../utils/sessionMetrics';
+
+function sessionPreview(s: { notesText: string | null; structuredMetrics?: Record<string, unknown> }, isParent: boolean): string | null {
+  const m = s.structuredMetrics ?? {};
+  const parentSummary = String(m.parentSummary ?? '').trim();
+  if (isParent && parentSummary) return parentSummary;
+  if (parentSummary) return parentSummary;
+  return s.notesText?.trim() || null;
+}
 
 export default function SessionsPage() {
   const { childId } = useParams<{ childId: string }>();
@@ -43,6 +56,7 @@ export default function SessionsPage() {
   if (!childId) return null;
 
   const canLog = user?.role === 'admin' || user?.role === 'therapist';
+  const isParent = user?.role === 'parent';
 
   return (
     <div>
@@ -87,16 +101,22 @@ export default function SessionsPage() {
                       </p>
                     </div>
                     <div className="flex gap-3 text-xs text-slate-600">
-                      {(['engagement', 'focus', 'communication'] as const).map((k) =>
+                      {CORE_SESSION_METRICS.map((k) =>
                         metrics[k] != null ? (
                           <span key={k} className="rounded bg-slate-100 px-2 py-1">
-                            {sessionMetricLabel(k)}: <b>{String(metrics[k])}</b>
+                            {sessionMetricLabel(k)}:{' '}
+                            <b>{formatMetricDisplay(metrics[k], isParent ? 'parent' : 'therapist')}</b>
                           </span>
                         ) : null
                       )}
                     </div>
                   </div>
-                  {s.notesText && <p className="mt-2 line-clamp-2 text-sm text-slate-600">{s.notesText}</p>}
+                  {(() => {
+                    const preview = sessionPreview(s, isParent);
+                    return preview ? (
+                      <p className="mt-2 line-clamp-2 text-sm text-slate-600">{preview}</p>
+                    ) : null;
+                  })()}
                 </Card>
               </Link>
             );

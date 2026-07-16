@@ -18,6 +18,9 @@ import aiRoutes from './modules/ai/aiRoutes';
 import notificationsRoutes from './modules/notifications/notifications.routes';
 import appointmentsRoutes from './modules/appointments/appointments.routes';
 import reportsRoutes from './modules/reports/reports.routes';
+import assessmentsRoutes from './modules/assessments/assessments.routes';
+import resourcesRoutes from './modules/resources/resources.routes';
+import billingRoutes from './modules/billing/billing.routes';
 
 const app = express();
 
@@ -27,7 +30,7 @@ app.use(
     origin: (origin, cb) => {
       const allowed =
         !origin ||
-        /^https:\/\/(helixcareaifrontend|mobile|helixcareai)(-\w+)?\.vercel\.app$/i.test(origin) ||
+        /^https:\/\/(helixcareaifrontend|mobile|helixcareai|helixacareai)[\w.-]*\.vercel\.app$/i.test(origin) ||
         /^http:\/\/localhost(:\d+)?$/i.test(origin) ||
         /^http:\/\/127\.0\.0\.1(:\d+)?$/i.test(origin) ||
         /^http:\/\/\[::1\](:\d+)?$/i.test(origin);
@@ -36,7 +39,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
@@ -48,6 +51,9 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/assessments', assessmentsRoutes);
+app.use('/api/resources', resourcesRoutes);
+app.use('/api/billing', billingRoutes);
 
 app.get('/api-docs/spec', (req, res) => res.json(specWithServer(req)));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, { customSiteTitle: 'HelixCareAI API', swaggerOptions: { url: '/api-docs/spec' } }));
@@ -55,6 +61,10 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(null, { customSiteTitle: '
 app.get('/', (_req, res) => res.json({ name: 'HelixCareAI API', status: 'ok', docs: '/api-docs', health: '/health' }));
 app.get('/api', (_req, res) => res.json({ name: 'HelixCareAI API', status: 'ok', docs: '/api-docs', health: '/health' }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+app.use((_req, res) => {
+  res.status(404).json({ error: 'API route not found' });
+});
 
 app.use(errorHandler);
 

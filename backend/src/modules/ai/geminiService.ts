@@ -63,6 +63,27 @@ export async function askLLM(
   return text || 'No response generated.';
 }
 
+/** Direct system + user completion (non-RAG tasks). */
+export async function complete(
+  systemPrompt: string,
+  userPrompt: string,
+  options: GenerateOptions & { temperature?: number } = {}
+): Promise<string> {
+  const ai = getClient();
+  const model = options?.model ?? env.GEMINI_MODEL;
+  const response = await ai.models.generateContent({
+    model,
+    contents: userPrompt,
+    config: {
+      systemInstruction: systemPrompt,
+      maxOutputTokens: options?.maxTokens ?? 800,
+      temperature: options?.temperature ?? 0.35,
+    },
+  });
+  const text = response.text?.trim() ?? '';
+  return text || 'No response generated.';
+}
+
 export function isConfigured(): boolean {
   return Boolean(env.GEMINI_API_KEY);
 }

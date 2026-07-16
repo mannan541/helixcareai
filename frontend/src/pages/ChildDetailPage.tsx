@@ -83,11 +83,13 @@ export default function ChildDetailPage() {
   const assignedTherapists = therapists.filter((t) => assignedIds.includes(t.id));
 
   const actions = [
+    { to: `/children/${childId}/timeline`, label: 'Timeline', icon: '🕐', desc: 'Full history — sessions, appointments, comments & more' },
     { to: `/children/${childId}/sessions`, label: 'Sessions', icon: '📝', desc: 'View & log therapy sessions' },
     { to: `/children/${childId}/analytics`, label: 'Performance', icon: '📈', desc: 'Charts of session metrics' },
     { to: `/children/${childId}/report`, label: 'Export report', icon: '📄', desc: 'Attendance, performance & progress' },
     { to: `/children/${childId}/chat`, label: 'AI Assistant', icon: '💬', desc: 'Ask about this child' },
     { to: `/children/${childId}/schedule`, label: 'Appointments', icon: '📅', desc: 'Scheduled appointments' },
+    { to: `/children/${childId}/resources`, label: 'Resources', icon: '📚', desc: 'Assigned worksheets, stories & materials' },
   ];
 
   return (
