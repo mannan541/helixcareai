@@ -13,7 +13,8 @@ router.post(
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('fullName').trim().notEmpty(),
-    body('role').isIn(['admin', 'therapist', 'parent']),
+    // Admin accounts cannot be self-registered — only created by an existing admin (see admin.routes.ts).
+    body('role').isIn(['therapist', 'parent']),
   ]),
   asyncHandler(authController.register)
 );

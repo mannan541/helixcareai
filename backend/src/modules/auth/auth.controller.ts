@@ -100,8 +100,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     res.status(401).json({ error: 'Invalid email or password' });
     return;
   }
-  // Admin accounts can always sign in; others require approval
-  if (!user.approved_at && user.role !== 'admin') {
+  if (!user.approved_at) {
     res.status(403).json({ error: 'Account pending approval. An admin must approve your account before you can sign in.' });
     return;
   }
