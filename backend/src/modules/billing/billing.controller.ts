@@ -181,8 +181,8 @@ export async function deletePlan(req: Request, res: Response): Promise<void> {
   res.status(204).send();
 }
 
-export async function listChildPackages(_req: Request, res: Response): Promise<void> {
-  const rows = await billingService.listChildPackages();
+export async function listChildPackages(req: Request, res: Response): Promise<void> {
+  const rows = await billingService.listChildPackages(req.query.childId as string | undefined);
   res.json({ childPackages: rows.map(childPackageDto) });
 }
 
@@ -204,8 +204,8 @@ export async function deleteChildPackage(req: Request, res: Response): Promise<v
   res.status(204).send();
 }
 
-export async function listChildSubscriptions(_req: Request, res: Response): Promise<void> {
-  const rows = await billingService.listChildSubscriptions();
+export async function listChildSubscriptions(req: Request, res: Response): Promise<void> {
+  const rows = await billingService.listChildSubscriptions(req.query.childId as string | undefined);
   res.json({ childSubscriptions: rows.map(childSubscriptionDto) });
 }
 
@@ -290,6 +290,19 @@ export async function createInvoice(req: Request, res: Response): Promise<void> 
   res.status(201).json({ invoice: invDto(row) });
 }
 
+export async function updateInvoice(req: Request, res: Response): Promise<void> {
+  const result = await billingService.updateInvoice(req.params.id, req.body);
+  if (result.reason === 'not_found') {
+    res.status(404).json({ error: 'Invoice not found' });
+    return;
+  }
+  if (result.reason === 'already_paid') {
+    res.status(409).json({ error: 'This invoice is already paid and cannot be edited.' });
+    return;
+  }
+  res.json({ invoice: invDto(result.invoice!) });
+}
+
 export async function payInvoice(req: Request, res: Response): Promise<void> {
   const { paymentMethod, reference } = req.body;
   const row = await billingService.markInvoicePaid(req.params.id, paymentMethod, reference);
@@ -352,7 +365,8 @@ export async function assignSubscription(req: Request, res: Response): Promise<v
 export async function outstanding(req: Request, res: Response): Promise<void> {
   const from = req.query.from as string | undefined;
   const to = req.query.to as string | undefined;
-  const rows = await billingService.getOutstandingOverview({ from, to });
+  const childId = req.query.childId as string | undefined;
+  const rows = await billingService.getOutstandingOverview({ from, to, childId });
   const total = rows.reduce((s, r) => s + r.outstandingCents, 0);
   res.json({ outstanding: rows, totalOutstandingCents: total });
 }

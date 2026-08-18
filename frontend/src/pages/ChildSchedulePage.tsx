@@ -5,7 +5,7 @@ import { getChild } from '../api/children';
 import type { Appointment, Child } from '../api/types';
 import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary } from '../components/ui';
+import { Field, Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary, btnSecondary, inputCls } from '../components/ui';
 import BackButton from '../components/BackButton';
 import AppointmentCard from '../components/AppointmentCard';
 
@@ -17,6 +17,8 @@ export default function ChildSchedulePage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const load = async () => {
     if (!childId) return;
@@ -42,6 +44,9 @@ export default function ChildSchedulePage() {
   if (error) return <ErrorMessage error={error} onRetry={load} />;
 
   const canBook = user?.role === 'admin' || user?.role === 'parent';
+  const filtered = appointments.filter(
+    (a) => (!fromDate || a.appointment_date >= fromDate) && (!toDate || a.appointment_date <= toDate)
+  );
 
   return (
     <div>
@@ -61,11 +66,34 @@ export default function ChildSchedulePage() {
         Appointments{child ? ` — ${child.firstName} ${child.lastName}` : ''}
       </PageTitle>
 
-      {appointments.length === 0 ? (
-        <EmptyState>No appointments for this child</EmptyState>
+      {appointments.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <Field label="From">
+            <input type="date" className={inputCls} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </Field>
+          <Field label="To">
+            <input type="date" className={inputCls} value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </Field>
+          {(fromDate || toDate) && (
+            <button
+              type="button"
+              className={btnSecondary}
+              onClick={() => {
+                setFromDate('');
+                setToDate('');
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <EmptyState>{appointments.length === 0 ? 'No appointments for this child' : 'No appointments in this date range'}</EmptyState>
       ) : (
         <div className="space-y-2">
-          {appointments.map((a) => (
+          {filtered.map((a) => (
             <AppointmentCard key={a.id} appointment={a} />
           ))}
         </div>

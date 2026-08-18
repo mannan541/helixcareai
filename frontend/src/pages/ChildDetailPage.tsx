@@ -8,12 +8,14 @@ import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import {
   Card,
+  Field,
   Spinner,
   ErrorMessage,
   EmptyState,
   PageTitle,
   btnSecondary,
   btnDanger,
+  inputCls,
   StatusBadge,
   ConfirmDialog,
 } from '../components/ui';
@@ -70,6 +72,8 @@ export default function ChildDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [billing, setBilling] = useState<ChildBillingAccount | null>(null);
   const [billingError, setBillingError] = useState('');
+  const [billingFrom, setBillingFrom] = useState('');
+  const [billingTo, setBillingTo] = useState('');
 
   const load = async () => {
     if (!childId) return;
@@ -286,28 +290,61 @@ export default function ChildDetailPage() {
             )}
 
             <div>
-              <h3 className="mb-1 text-sm font-semibold text-slate-900">Invoices</h3>
-              {billing.invoices.length === 0 ? (
-                <EmptyState>
-                  <p className="text-sm text-slate-500">No invoices yet</p>
-                </EmptyState>
-              ) : (
-                <div className="space-y-1">
-                  {billing.invoices.slice(0, 5).map((inv) => (
-                    <Link
-                      key={inv.id}
-                      to={isAdmin ? `/admin/billing/invoices/${inv.id}` : `/billing/invoices/${inv.id}`}
-                      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-sm hover:bg-slate-50"
-                    >
-                      <span className="truncate">{inv.invoiceNumber} — {inv.title}</span>
-                      <span className="flex items-center gap-2 whitespace-nowrap">
-                        <span className="font-semibold">{formatMoney(inv.amountCents)}</span>
-                        <InvoiceStatus status={inv.status} />
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-900">Invoices</h3>
+                {billing.invoices.length > 0 && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <Field label="From">
+                      <input type="date" className={`${inputCls} py-1`} value={billingFrom} onChange={(e) => setBillingFrom(e.target.value)} />
+                    </Field>
+                    <Field label="To">
+                      <input type="date" className={`${inputCls} py-1`} value={billingTo} onChange={(e) => setBillingTo(e.target.value)} />
+                    </Field>
+                    {(billingFrom || billingTo) && (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-primary"
+                        onClick={() => {
+                          setBillingFrom('');
+                          setBillingTo('');
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {(() => {
+                const filteredInvoices = billing.invoices.filter((inv) => {
+                  const created = inv.createdAt.slice(0, 10);
+                  return (!billingFrom || created >= billingFrom) && (!billingTo || created <= billingTo);
+                });
+                const showInvoices = billingFrom || billingTo ? filteredInvoices : filteredInvoices.slice(0, 5);
+                return showInvoices.length === 0 ? (
+                  <EmptyState>
+                    <p className="text-sm text-slate-500">
+                      {billing.invoices.length === 0 ? 'No invoices yet' : 'No invoices in this date range'}
+                    </p>
+                  </EmptyState>
+                ) : (
+                  <div className="space-y-1">
+                    {showInvoices.map((inv) => (
+                      <Link
+                        key={inv.id}
+                        to={isAdmin ? `/admin/billing/invoices/${inv.id}` : `/billing/invoices/${inv.id}`}
+                        className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-sm hover:bg-slate-50"
+                      >
+                        <span className="truncate">{inv.invoiceNumber} — {inv.title}</span>
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <span className="font-semibold">{formatMoney(inv.amountCents)}</span>
+                          <InvoiceStatus status={inv.status} />
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

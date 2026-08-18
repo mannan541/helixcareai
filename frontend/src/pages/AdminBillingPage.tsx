@@ -92,9 +92,11 @@ export default function AdminBillingPage() {
   const [assignPkgId, setAssignPkgId] = useState('');
   const [assignPlanId, setAssignPlanId] = useState('');
   const [assignPlanEffectiveFrom, setAssignPlanEffectiveFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const [sessionAmount, setSessionAmount] = useState('150');
   const [outstandingFrom, setOutstandingFrom] = useState('');
   const [outstandingTo, setOutstandingTo] = useState('');
+  const [filterChildId, setFilterChildId] = useState('');
+  const [billingPromptSessionId, setBillingPromptSessionId] = useState<string | null>(null);
+  const [billingPromptAmount, setBillingPromptAmount] = useState('');
   const [busy, setBusy] = useState(false);
 
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
@@ -127,23 +129,24 @@ export default function AdminBillingPage() {
     navigate(`/admin/billing/invoices/${invoice.id}`, { state: { successMessage: message } });
   };
 
-  const load = async (opts?: { silent?: boolean; from?: string; to?: string }) => {
+  const load = async (opts?: { silent?: boolean; from?: string; to?: string; childId?: string }) => {
     if (opts?.silent) setRefreshing(true);
     else setInitialLoading(true);
     setError('');
     const failures: string[] = [];
     const outFrom = opts?.from !== undefined ? opts.from : outstandingFrom;
     const outTo = opts?.to !== undefined ? opts.to : outstandingTo;
+    const childFilter = opts?.childId !== undefined ? opts.childId : filterChildId;
 
     const [outR, pkgR, planR, invR, sessR, childR, childPkgR, childSubR] = await Promise.allSettled([
-      getOutstanding({ from: outFrom || undefined, to: outTo || undefined }),
+      getOutstanding({ from: outFrom || undefined, to: outTo || undefined, childId: childFilter || undefined }),
       listPackages(),
       listPlans(),
-      listInvoices(),
-      listSessionsBillingStatus(),
+      listInvoices({ childId: childFilter || undefined }),
+      listSessionsBillingStatus(childFilter || undefined),
       listChildren(),
-      listChildPackages(),
-      listChildSubscriptions(),
+      listChildPackages(childFilter || undefined),
+      listChildSubscriptions(childFilter || undefined),
     ]);
 
     if (outR.status === 'fulfilled') setOutstanding(outR.value);
@@ -379,6 +382,36 @@ export default function AdminBillingPage() {
       <p className="text-sm text-slate-600">Manage packages, subscriptions, session billing, and outstanding balances.</p>
 
       {error && <ErrorMessage error={error} onRetry={() => load({ silent: true })} />}
+
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="Filter by child">
+          <select
+            className={`${inputCls} min-w-[12rem]`}
+            value={filterChildId}
+            onChange={(e) => {
+              setFilterChildId(e.target.value);
+              load({ silent: true, childId: e.target.value });
+            }}
+          >
+            <option value="">All children</option>
+            {children.map((c) => (
+              <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+            ))}
+          </select>
+        </Field>
+        {filterChildId && (
+          <button
+            type="button"
+            className={btnSecondary}
+            onClick={() => {
+              setFilterChildId('');
+              load({ silent: true, childId: '' });
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {tabs.map((t) => (
@@ -867,9 +900,6 @@ export default function AdminBillingPage() {
           {tab === 'sessions' && (
             <div className="space-y-3">
               <p className="text-sm text-slate-600">Session billing status — create an invoice for unbilled sessions, or mark an existing one as paid.</p>
-              <Field label="Default session amount (used when creating an invoice)">
-                <input className={`${inputCls} max-w-xs`} value={sessionAmount} onChange={(e) => setSessionAmount(e.target.value)} />
-              </Field>
               {sessions.length === 0 ? (
                 <EmptyState>
                   <p className="font-semibold text-slate-700">No sessions yet</p>
@@ -887,44 +917,31 @@ export default function AdminBillingPage() {
                       </p>
                     </div>
                     {!s.invoiceId ? (
-                      <button
-                        type="button"
-                        className={btnPrimary}
-                        disabled={busy}
-                        onClick={async () => {
-                          setBusy(true);
-                          setError('');
-                          try {
-                            const invoice = await billSession({
-                              childId: s.childId,
-                              sessionId: s.id,
-                              amountCents: parseMoneyToCents(sessionAmount),
-                            });
-                            await load({ silent: true });
-                            openInvoice(invoice, `Invoice ${invoice.invoiceNumber} created for session billing.`);
-                          } catch (err) {
-                            setError(errorMessage(err));
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        Create invoice
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <InvoiceStatus status={s.invoiceStatus ?? 'pending'} />
-                        {(s.invoiceStatus === 'pending' || s.invoiceStatus === 'overdue') && (
+                      billingPromptSessionId === s.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            className={`${inputCls} w-28`}
+                            value={billingPromptAmount}
+                            onChange={(e) => setBillingPromptAmount(e.target.value)}
+                            placeholder="Amount"
+                            autoFocus
+                          />
                           <button
                             type="button"
-                            className={btnSecondary}
+                            className={btnPrimary}
                             disabled={busy}
                             onClick={async () => {
                               setBusy(true);
                               setError('');
                               try {
-                                await payInvoice(s.invoiceId!);
+                                const invoice = await billSession({
+                                  childId: s.childId,
+                                  sessionId: s.id,
+                                  amountCents: parseMoneyToCents(billingPromptAmount),
+                                });
+                                setBillingPromptSessionId(null);
                                 await load({ silent: true });
+                                openInvoice(invoice, `Invoice ${invoice.invoiceNumber} created for session billing.`);
                               } catch (err) {
                                 setError(errorMessage(err));
                               } finally {
@@ -932,8 +949,56 @@ export default function AdminBillingPage() {
                               }
                             }}
                           >
-                            Mark as paid
+                            Confirm
                           </button>
+                          <button type="button" className={btnSecondary} onClick={() => setBillingPromptSessionId(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={btnPrimary}
+                          onClick={() => {
+                            setBillingPromptSessionId(s.id);
+                            setBillingPromptAmount('150');
+                          }}
+                        >
+                          Create invoice
+                        </button>
+                      )
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <InvoiceStatus status={s.invoiceStatus ?? 'pending'} />
+                        {(s.invoiceStatus === 'pending' || s.invoiceStatus === 'overdue') && (
+                          <>
+                            <button
+                              type="button"
+                              className={btnSecondary}
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true);
+                                setError('');
+                                try {
+                                  await payInvoice(s.invoiceId!);
+                                  await load({ silent: true });
+                                } catch (err) {
+                                  setError(errorMessage(err));
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              Mark as paid
+                            </button>
+                            <button
+                              type="button"
+                              className={btnSecondary}
+                              onClick={() => navigate(`/admin/billing/invoices/${s.invoiceId}`)}
+                            >
+                              Edit
+                            </button>
+                          </>
                         )}
                       </div>
                     )}
@@ -967,22 +1032,34 @@ export default function AdminBillingPage() {
                     <div className="flex items-center gap-3">
                       <p className="font-bold">{formatMoney(inv.amountCents, inv.currency)}</p>
                       <InvoiceStatus status={inv.status} />
-                      {inv.status === 'pending' && (
-                        <button
-                          type="button"
-                          className={btnSecondary}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              await payInvoice(inv.id);
-                              await load({ silent: true });
-                            } catch (err) {
-                              setError(errorMessage(err));
-                            }
-                          }}
-                        >
-                          Mark paid
-                        </button>
+                      {(inv.status === 'pending' || inv.status === 'overdue') && (
+                        <>
+                          <button
+                            type="button"
+                            className={btnSecondary}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await payInvoice(inv.id);
+                                await load({ silent: true });
+                              } catch (err) {
+                                setError(errorMessage(err));
+                              }
+                            }}
+                          >
+                            Mark paid
+                          </button>
+                          <button
+                            type="button"
+                            className={btnSecondary}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              navigate(`/admin/billing/invoices/${inv.id}`);
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </>
                       )}
                       <span className="text-sm font-semibold text-primary">View →</span>
                     </div>

@@ -119,7 +119,7 @@ export async function getChildBilling(childId: string): Promise<ChildBillingAcco
   return data.account;
 }
 
-export async function getOutstanding(params?: { from?: string; to?: string }): Promise<{
+export async function getOutstanding(params?: { from?: string; to?: string; childId?: string }): Promise<{
   outstanding: { childId: string; childName: string; outstandingCents: number; currency: string; invoiceCount: number }[];
   totalOutstandingCents: number;
 }> {
@@ -157,8 +157,10 @@ export async function deletePackage(id: string): Promise<void> {
   await api.delete(`/api/billing/packages/${id}`);
 }
 
-export async function listChildPackages(): Promise<ChildPackageAssignment[]> {
-  const { data } = await api.get<{ childPackages: ChildPackageAssignment[] }>('/api/billing/child-packages');
+export async function listChildPackages(childId?: string): Promise<ChildPackageAssignment[]> {
+  const { data } = await api.get<{ childPackages: ChildPackageAssignment[] }>('/api/billing/child-packages', {
+    params: { childId },
+  });
   return data.childPackages;
 }
 
@@ -206,8 +208,10 @@ export async function deletePlan(id: string): Promise<void> {
   await api.delete(`/api/billing/plans/${id}`);
 }
 
-export async function listChildSubscriptions(): Promise<ChildSubscriptionAssignment[]> {
-  const { data } = await api.get<{ childSubscriptions: ChildSubscriptionAssignment[] }>('/api/billing/child-subscriptions');
+export async function listChildSubscriptions(childId?: string): Promise<ChildSubscriptionAssignment[]> {
+  const { data } = await api.get<{ childSubscriptions: ChildSubscriptionAssignment[] }>('/api/billing/child-subscriptions', {
+    params: { childId },
+  });
   return data.childSubscriptions;
 }
 
@@ -238,6 +242,14 @@ export async function getInvoice(id: string): Promise<{ invoice: Invoice; paymen
 
 export async function payInvoice(id: string, paymentMethod?: string): Promise<Invoice> {
   const { data } = await api.post<{ invoice: Invoice }>(`/api/billing/invoices/${id}/pay`, { paymentMethod });
+  return data.invoice;
+}
+
+export async function updateInvoice(
+  id: string,
+  input: Partial<{ title: string; amountCents: number; dueDate: string | null; notes: string | null }>
+): Promise<Invoice> {
+  const { data } = await api.patch<{ invoice: Invoice }>(`/api/billing/invoices/${id}`, input);
   return data.invoice;
 }
 

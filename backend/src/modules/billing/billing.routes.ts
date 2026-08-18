@@ -26,10 +26,18 @@ router.use(requireAdmin);
 
 router.get(
   '/outstanding',
-  validate([query('from').optional().isISO8601(), query('to').optional().isISO8601()]),
+  validate([
+    query('from').optional().isISO8601(),
+    query('to').optional().isISO8601(),
+    query('childId').optional().isUUID(),
+  ]),
   billingController.outstanding
 );
-router.get('/sessions', billingController.sessionsBillingStatus);
+router.get(
+  '/sessions',
+  validate([query('childId').optional().isUUID()]),
+  billingController.sessionsBillingStatus
+);
 
 router.get('/packages', billingController.listPackages);
 router.post(
@@ -54,7 +62,11 @@ router.patch(
 );
 router.delete('/packages/:id', validate([param('id').isUUID()]), billingController.deletePackage);
 
-router.get('/child-packages', billingController.listChildPackages);
+router.get(
+  '/child-packages',
+  validate([query('childId').optional().isUUID()]),
+  billingController.listChildPackages
+);
 router.patch(
   '/child-packages/:id',
   validate([
@@ -93,7 +105,11 @@ router.patch(
 );
 router.delete('/plans/:id', validate([param('id').isUUID()]), billingController.deletePlan);
 
-router.get('/child-subscriptions', billingController.listChildSubscriptions);
+router.get(
+  '/child-subscriptions',
+  validate([query('childId').optional().isUUID()]),
+  billingController.listChildSubscriptions
+);
 router.patch(
   '/child-subscriptions/:id',
   validate([
@@ -111,6 +127,17 @@ router.post(
   '/invoices',
   validate([body('childId').isUUID(), body('title').trim().notEmpty(), body('amountCents').isInt({ min: 0 })]),
   billingController.createInvoice
+);
+router.patch(
+  '/invoices/:id',
+  validate([
+    param('id').isUUID(),
+    body('title').optional().trim().notEmpty(),
+    body('amountCents').optional().isInt({ min: 0 }),
+    body('dueDate').optional({ nullable: true }).isISO8601(),
+    body('notes').optional({ nullable: true }).isString(),
+  ]),
+  billingController.updateInvoice
 );
 router.post('/invoices/:id/pay', validate([param('id').isUUID()]), billingController.payInvoice);
 

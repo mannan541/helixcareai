@@ -12,7 +12,7 @@ import {
 import type { Child } from '../api/types';
 import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Card, Spinner, ErrorMessage, EmptyState, PageTitle, btnSecondary, btnDanger, ConfirmDialog } from '../components/ui';
+import { Card, Field, Spinner, ErrorMessage, EmptyState, PageTitle, btnSecondary, btnDanger, inputCls, ConfirmDialog } from '../components/ui';
 import BackButton from '../components/BackButton';
 import { formatDate } from '../utils/format';
 
@@ -42,6 +42,8 @@ export default function ChildResourcesPage() {
   const [error, setError] = useState('');
   const [unassignTarget, setUnassignTarget] = useState<TherapyResource | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const canManage = user?.role === 'admin' || user?.role === 'therapist';
 
@@ -68,7 +70,11 @@ export default function ChildResourcesPage() {
   if (loading) return <Spinner />;
   if (error) return <ErrorMessage error={error} onRetry={load} />;
 
-  const grouped = resources.reduce(
+  const filteredResources = resources.filter((r) => {
+    const assignedDate = r.assignedAt ? r.assignedAt.slice(0, 10) : '';
+    return (!fromDate || assignedDate >= fromDate) && (!toDate || assignedDate <= toDate);
+  });
+  const grouped = filteredResources.reduce(
     (acc, r) => {
       if (!acc[r.category]) acc[r.category] = [];
       acc[r.category].push(r);
@@ -84,14 +90,41 @@ export default function ChildResourcesPage() {
       </PageTitle>
       <p className="text-sm text-slate-600">Therapy materials assigned to this child — worksheets, schedules, stories, and more.</p>
 
-      {resources.length === 0 ? (
+      {resources.length > 0 && (
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Assigned from">
+            <input type="date" className={inputCls} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </Field>
+          <Field label="Assigned to">
+            <input type="date" className={inputCls} value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </Field>
+          {(fromDate || toDate) && (
+            <button
+              type="button"
+              className={btnSecondary}
+              onClick={() => {
+                setFromDate('');
+                setToDate('');
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {filteredResources.length === 0 ? (
         <EmptyState>
           <p className="text-4xl">📚</p>
-          <p className="mt-3 font-semibold text-slate-700">No resources assigned yet</p>
+          <p className="mt-3 font-semibold text-slate-700">
+            {resources.length === 0 ? 'No resources assigned yet' : 'No resources in this date range'}
+          </p>
           <p className="mt-1 text-slate-500">
-            {canManage
-              ? 'Open the Resource Library to upload materials and assign them to this child.'
-              : 'Your therapist will assign worksheets, schedules, and stories here.'}
+            {resources.length === 0
+              ? canManage
+                ? 'Open the Resource Library to upload materials and assign them to this child.'
+                : 'Your therapist will assign worksheets, schedules, and stories here.'
+              : 'Try a different date range.'}
           </p>
         </EmptyState>
       ) : (

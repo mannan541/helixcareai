@@ -5,7 +5,7 @@ import { getChild } from '../api/children';
 import type { Child, Session } from '../api/types';
 import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Card, Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary } from '../components/ui';
+import { Card, Field, Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary, btnSecondary, inputCls } from '../components/ui';
 import BackButton from '../components/BackButton';
 import { formatDate } from '../utils/format';
 import {
@@ -30,6 +30,8 @@ export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const load = async () => {
     if (!childId) return;
@@ -57,6 +59,9 @@ export default function SessionsPage() {
 
   const canLog = user?.role === 'admin' || user?.role === 'therapist';
   const isParent = user?.role === 'parent';
+  const filtered = sessions.filter(
+    (s) => (!fromDate || s.sessionDate >= fromDate) && (!toDate || s.sessionDate <= toDate)
+  );
 
   return (
     <div>
@@ -73,11 +78,34 @@ export default function SessionsPage() {
         Sessions{child ? ` — ${child.firstName} ${child.lastName}` : ''}
       </PageTitle>
 
-      {sessions.length === 0 ? (
-        <EmptyState>No sessions logged yet</EmptyState>
+      {sessions.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <Field label="From">
+            <input type="date" className={inputCls} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </Field>
+          <Field label="To">
+            <input type="date" className={inputCls} value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </Field>
+          {(fromDate || toDate) && (
+            <button
+              type="button"
+              className={btnSecondary}
+              onClick={() => {
+                setFromDate('');
+                setToDate('');
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <EmptyState>{sessions.length === 0 ? 'No sessions logged yet' : 'No sessions in this date range'}</EmptyState>
       ) : (
         <div className="space-y-2">
-          {sessions.map((s) => {
+          {filtered.map((s) => {
             const metrics = s.structuredMetrics ?? {};
             const therapy = metrics.therapyTitle as string | undefined;
             const timeSlot = metrics.timeSlot as string | undefined;

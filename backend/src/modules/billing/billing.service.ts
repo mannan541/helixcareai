@@ -247,6 +247,29 @@ export async function markInvoicePaid(id: string, paymentMethod?: string, refere
   return updated ?? null;
 }
 
+/** Edit an invoice's title/amount/due date/notes — only allowed before it's paid. */
+export async function updateInvoice(
+  id: string,
+  data: Partial<{ title: string; amountCents: number; currency: string; dueDate: string | null; notes: string | null }>
+): Promise<{ ok: boolean; reason?: 'not_found' | 'already_paid'; invoice?: InvoiceRow }> {
+  const existing = await queryOne<InvoiceRow>('SELECT * FROM invoices WHERE id = $1', [id]);
+  if (!existing) return { ok: false, reason: 'not_found' };
+  if (existing.status === 'paid') return { ok: false, reason: 'already_paid' };
+
+  const rows = await query<InvoiceRow>(
+    `UPDATE invoices SET
+       title = COALESCE($2, title),
+       amount_cents = COALESCE($3, amount_cents),
+       currency = COALESCE($4, currency),
+       due_date = COALESCE($5, due_date),
+       notes = COALESCE($6, notes),
+       updated_at = NOW()
+     WHERE id = $1 RETURNING *`,
+    [id, data.title?.trim(), data.amountCents, data.currency, data.dueDate, data.notes?.trim()]
+  );
+  return { ok: true, invoice: rows[0] };
+}
+
 export type InvoiceListRow = InvoiceRow & {
   child_first_name: string;
   child_last_name: string;
@@ -465,15 +488,23 @@ export type ChildSubscriptionListRow = ChildSubscriptionRow & {
   plan_name: string;
 };
 
-/** All package assignments across all children (admin view). */
-export async function listChildPackages(): Promise<ChildPackageListRow[]> {
+/** All package assignments across all children (admin view), optionally scoped to one child. */
+export async function listChildPackages(childId?: string): Promise<ChildPackageListRow[]> {
+  const params: unknown[] = [];
+  let where = '';
+  if (childId) {
+    params.push(childId);
+    where = `WHERE cp.child_id = $${params.length}`;
+  }
   return query<ChildPackageListRow>(
     `SELECT cp.*, c.first_name AS child_first_name, c.last_name AS child_last_name, p.name AS package_name
      FROM child_packages cp
      JOIN children c ON c.id = cp.child_id
      JOIN therapy_packages p ON p.id = cp.package_id
+     ${where}
      ORDER BY cp.purchased_at DESC
-     LIMIT 200`
+     LIMIT 200`,
+    params
   );
 }
 
@@ -505,15 +536,23 @@ export async function deleteChildPackage(id: string): Promise<boolean> {
   return result.length > 0;
 }
 
-/** All subscription assignments across all children (admin view). */
-export async function listChildSubscriptions(): Promise<ChildSubscriptionListRow[]> {
+/** All subscription assignments across all children (admin view), optionally scoped to one child. */
+export async function listChildSubscriptions(childId?: string): Promise<ChildSubscriptionListRow[]> {
+  const params: unknown[] = [];
+  let where = '';
+  if (childId) {
+    params.push(childId);
+    where = `WHERE cs.child_id = $${params.length}`;
+  }
   return query<ChildSubscriptionListRow>(
     `SELECT cs.*, c.first_name AS child_first_name, c.last_name AS child_last_name, sp.name AS plan_name
      FROM child_subscriptions cs
      JOIN children c ON c.id = cs.child_id
      JOIN subscription_plans sp ON sp.id = cs.plan_id
+     ${where}
      ORDER BY cs.started_at DESC
-     LIMIT 200`
+     LIMIT 200`,
+    params
   );
 }
 
@@ -678,7 +717,7 @@ export async function getParentBillingSummary(userId: string): Promise<ChildBill
   return accounts;
 }
 
-export async function getOutstandingOverview(filters: { from?: string; to?: string } = {}): Promise<
+export async function getOutstandingOverview(filters: { from?: string; to?: string; childId?: string } = {}): Promise<
   Array<{
     childId: string;
     childName: string;
@@ -697,6 +736,11 @@ export async function getOutstandingOverview(filters: { from?: string; to?: stri
     params.push(filters.to);
     dateConditions.push(`AND i.created_at < ($${params.length}::date + INTERVAL '1 day')`);
   }
+  let childCondition = '';
+  if (filters.childId) {
+    params.push(filters.childId);
+    childCondition = `WHERE c.id = $${params.length}`;
+  }
   const rows = await query<{
     child_id: string;
     first_name: string;
@@ -711,6 +755,7 @@ export async function getOutstandingOverview(filters: { from?: string; to?: stri
             COUNT(i.id)::text AS invoice_count
      FROM children c
      LEFT JOIN invoices i ON i.child_id = c.id AND i.status IN ('pending', 'overdue') ${dateConditions.join(' ')}
+     ${childCondition}
      GROUP BY c.id, c.first_name, c.last_name
      HAVING COALESCE(SUM(i.amount_cents), 0) > 0
      ORDER BY outstanding DESC`,
