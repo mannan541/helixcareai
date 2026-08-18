@@ -390,18 +390,28 @@ export async function assignPackageToChild(
 export async function assignSubscriptionToChild(
   userId: string,
   childId: string,
-  planId: string
+  planId: string,
+  effectiveFrom?: string
 ): Promise<{ subscription: Record<string, unknown>; invoice: InvoiceRow } | null> {
   const plan = await queryOne<PlanRow>('SELECT * FROM subscription_plans WHERE id = $1 AND is_active = true', [planId]);
   if (!plan) return null;
 
-  const nextBilling = new Date();
+  const startDate = effectiveFrom ? new Date(effectiveFrom) : new Date();
+  const nextBilling = new Date(startDate);
   nextBilling.setMonth(nextBilling.getMonth() + plan.interval_months);
 
   const rows = await query(
-    `INSERT INTO child_subscriptions (child_id, plan_id, amount_cents, currency, status, next_billing_date, assigned_by)
-     VALUES ($1, $2, $3, $4, 'active', $5, $6) RETURNING *`,
-    [childId, planId, plan.price_cents, plan.currency, nextBilling.toISOString().slice(0, 10), userId]
+    `INSERT INTO child_subscriptions (child_id, plan_id, amount_cents, currency, status, started_at, next_billing_date, assigned_by)
+     VALUES ($1, $2, $3, $4, 'active', $5, $6, $7) RETURNING *`,
+    [
+      childId,
+      planId,
+      plan.price_cents,
+      plan.currency,
+      startDate.toISOString(),
+      nextBilling.toISOString().slice(0, 10),
+      userId,
+    ]
   );
 
   const invoice = await createInvoice(userId, {
@@ -668,7 +678,7 @@ export async function getParentBillingSummary(userId: string): Promise<ChildBill
   return accounts;
 }
 
-export async function getOutstandingOverview(): Promise<
+export async function getOutstandingOverview(filters: { from?: string; to?: string } = {}): Promise<
   Array<{
     childId: string;
     childName: string;
@@ -677,6 +687,16 @@ export async function getOutstandingOverview(): Promise<
     invoiceCount: number;
   }>
 > {
+  const params: unknown[] = [];
+  const dateConditions: string[] = [];
+  if (filters.from) {
+    params.push(filters.from);
+    dateConditions.push(`AND i.created_at >= $${params.length}`);
+  }
+  if (filters.to) {
+    params.push(filters.to);
+    dateConditions.push(`AND i.created_at < ($${params.length}::date + INTERVAL '1 day')`);
+  }
   const rows = await query<{
     child_id: string;
     first_name: string;
@@ -690,10 +710,11 @@ export async function getOutstandingOverview(): Promise<
             COALESCE(MAX(i.currency), 'AED') AS currency,
             COUNT(i.id)::text AS invoice_count
      FROM children c
-     LEFT JOIN invoices i ON i.child_id = c.id AND i.status IN ('pending', 'overdue')
+     LEFT JOIN invoices i ON i.child_id = c.id AND i.status IN ('pending', 'overdue') ${dateConditions.join(' ')}
      GROUP BY c.id, c.first_name, c.last_name
      HAVING COALESCE(SUM(i.amount_cents), 0) > 0
-     ORDER BY outstanding DESC`
+     ORDER BY outstanding DESC`,
+    params
   );
   return rows.map((r) => ({
     childId: r.child_id,
@@ -704,29 +725,36 @@ export async function getOutstandingOverview(): Promise<
   }));
 }
 
-export async function listUnbilledSessions(childId?: string): Promise<
+/** All recent sessions with their invoice/payment status (if billed) — for the admin "session billing" list. */
+export async function listSessionsBillingStatus(childId?: string): Promise<
   Array<{
     id: string;
     child_id: string;
     child_name: string;
     session_date: string;
     duration_minutes: number | null;
+    invoice_id: string | null;
+    invoice_number: string | null;
+    invoice_status: string | null;
+    amount_cents: number | null;
+    currency: string | null;
   }>
 > {
   const params: unknown[] = [];
   let extra = '';
   if (childId) {
     params.push(childId);
-    extra = ` AND s.child_id = $${params.length}`;
+    extra = ` WHERE s.child_id = $${params.length}`;
   }
   return query(
-    `SELECT s.id, s.child_id, c.first_name || ' ' || c.last_name AS child_name, s.session_date, s.duration_minutes
+    `SELECT s.id, s.child_id, c.first_name || ' ' || c.last_name AS child_name, s.session_date, s.duration_minutes,
+            i.id AS invoice_id, i.invoice_number, i.status AS invoice_status, i.amount_cents, i.currency
      FROM sessions s
      JOIN children c ON c.id = s.child_id
      LEFT JOIN invoices i ON i.session_id = s.id
-     WHERE i.id IS NULL${extra}
+     ${extra}
      ORDER BY s.session_date DESC
-     LIMIT 50`,
+     LIMIT 100`,
     params
   );
 }

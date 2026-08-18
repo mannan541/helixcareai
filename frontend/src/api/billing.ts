@@ -119,11 +119,11 @@ export async function getChildBilling(childId: string): Promise<ChildBillingAcco
   return data.account;
 }
 
-export async function getOutstanding(): Promise<{
+export async function getOutstanding(params?: { from?: string; to?: string }): Promise<{
   outstanding: { childId: string; childName: string; outstandingCents: number; currency: string; invoiceCount: number }[];
   totalOutstandingCents: number;
 }> {
-  const { data } = await api.get('/api/billing/outstanding');
+  const { data } = await api.get('/api/billing/outstanding', { params });
   return data;
 }
 
@@ -256,14 +256,28 @@ export async function assignPackage(childId: string, packageId: string): Promise
   return data.invoice;
 }
 
-export async function assignSubscription(childId: string, planId: string): Promise<Invoice> {
-  const { data } = await api.post<{ invoice: Invoice }>(`/api/billing/child/${childId}/subscription`, { planId });
+export async function assignSubscription(childId: string, planId: string, effectiveFrom?: string): Promise<Invoice> {
+  const { data } = await api.post<{ invoice: Invoice }>(`/api/billing/child/${childId}/subscription`, {
+    planId,
+    effectiveFrom: effectiveFrom || undefined,
+  });
   return data.invoice;
 }
 
-export async function listUnbilledSessions(childId?: string): Promise<
-  { id: string; childId: string; childName: string; sessionDate: string; durationMinutes: number | null }[]
-> {
-  const { data } = await api.get('/api/billing/unbilled-sessions', { params: { childId } });
+export type SessionBillingStatus = {
+  id: string;
+  childId: string;
+  childName: string;
+  sessionDate: string;
+  durationMinutes: number | null;
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  invoiceStatus: string | null;
+  amountCents: number | null;
+  currency: string | null;
+};
+
+export async function listSessionsBillingStatus(childId?: string): Promise<SessionBillingStatus[]> {
+  const { data } = await api.get('/api/billing/sessions', { params: { childId } });
   return data.sessions;
 }

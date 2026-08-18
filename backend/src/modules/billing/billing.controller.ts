@@ -332,8 +332,13 @@ export async function assignPackage(req: Request, res: Response): Promise<void> 
 }
 
 export async function assignSubscription(req: Request, res: Response): Promise<void> {
-  const { planId } = req.body;
-  const result = await billingService.assignSubscriptionToChild(req.user!.userId, req.params.childId, planId);
+  const { planId, effectiveFrom } = req.body;
+  const result = await billingService.assignSubscriptionToChild(
+    req.user!.userId,
+    req.params.childId,
+    planId,
+    effectiveFrom
+  );
   if (!result) {
     res.status(400).json({ error: 'Invalid child or plan' });
     return;
@@ -345,7 +350,9 @@ export async function assignSubscription(req: Request, res: Response): Promise<v
 }
 
 export async function outstanding(req: Request, res: Response): Promise<void> {
-  const rows = await billingService.getOutstandingOverview();
+  const from = req.query.from as string | undefined;
+  const to = req.query.to as string | undefined;
+  const rows = await billingService.getOutstandingOverview({ from, to });
   const total = rows.reduce((s, r) => s + r.outstandingCents, 0);
   res.json({ outstanding: rows, totalOutstandingCents: total });
 }
@@ -374,9 +381,9 @@ export async function childAccount(req: Request, res: Response): Promise<void> {
   res.json({ account });
 }
 
-export async function unbilledSessions(req: Request, res: Response): Promise<void> {
+export async function sessionsBillingStatus(req: Request, res: Response): Promise<void> {
   const childId = req.query.childId as string | undefined;
-  const rows = await billingService.listUnbilledSessions(childId);
+  const rows = await billingService.listSessionsBillingStatus(childId);
   res.json({
     sessions: rows.map((s) => ({
       id: s.id,
@@ -384,6 +391,11 @@ export async function unbilledSessions(req: Request, res: Response): Promise<voi
       childName: s.child_name,
       sessionDate: s.session_date,
       durationMinutes: s.duration_minutes,
+      invoiceId: s.invoice_id,
+      invoiceNumber: s.invoice_number,
+      invoiceStatus: s.invoice_status,
+      amountCents: s.amount_cents,
+      currency: s.currency,
     })),
   });
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { authMiddleware } from '../../middleware/auth';
 import { requireAdmin } from '../../middleware/roles';
 import { validate } from '../../middleware/validate';
@@ -24,8 +24,12 @@ router.get(
 
 router.use(requireAdmin);
 
-router.get('/outstanding', billingController.outstanding);
-router.get('/unbilled-sessions', billingController.unbilledSessions);
+router.get(
+  '/outstanding',
+  validate([query('from').optional().isISO8601(), query('to').optional().isISO8601()]),
+  billingController.outstanding
+);
+router.get('/sessions', billingController.sessionsBillingStatus);
 
 router.get('/packages', billingController.listPackages);
 router.post(
@@ -124,7 +128,11 @@ router.post(
 
 router.post(
   '/child/:childId/subscription',
-  validate([param('childId').isUUID(), body('planId').isUUID()]),
+  validate([
+    param('childId').isUUID(),
+    body('planId').isUUID(),
+    body('effectiveFrom').optional({ nullable: true }).isISO8601(),
+  ]),
   billingController.assignSubscription
 );
 

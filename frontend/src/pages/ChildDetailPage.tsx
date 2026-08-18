@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getChild, deleteChild } from '../api/children';
 import { listTherapists } from '../api/auth';
+import { getChildBilling, type ChildBillingAccount } from '../api/billing';
 import type { Child, User } from '../api/types';
 import { errorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +10,7 @@ import {
   Card,
   Spinner,
   ErrorMessage,
+  EmptyState,
   PageTitle,
   btnSecondary,
   btnDanger,
@@ -16,7 +18,21 @@ import {
   ConfirmDialog,
 } from '../components/ui';
 import BackButton from '../components/BackButton';
-import { formatDate } from '../utils/format';
+import { formatDate, formatMoney } from '../utils/format';
+
+function InvoiceStatus({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    pending: 'bg-amber-100 text-amber-800',
+    paid: 'bg-green-100 text-green-800',
+    overdue: 'bg-red-100 text-red-800',
+    cancelled: 'bg-slate-200 text-slate-600',
+  };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${colors[status] ?? 'bg-slate-100'}`}>
+      {status}
+    </span>
+  );
+}
 
 function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
   if (value == null || value === '') return null;
@@ -52,6 +68,8 @@ export default function ChildDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [billing, setBilling] = useState<ChildBillingAccount | null>(null);
+  const [billingError, setBillingError] = useState('');
 
   const load = async () => {
     if (!childId) return;
@@ -61,6 +79,9 @@ export default function ChildDetailPage() {
       const c = await getChild(childId);
       setChild(c);
       listTherapists().then(setTherapists).catch(() => {});
+      getChildBilling(childId)
+        .then(setBilling)
+        .catch((err) => setBillingError(errorMessage(err)));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -205,6 +226,92 @@ export default function ChildDetailPage() {
           )}
         </Card>
       )}
+
+      <Card>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="font-bold">Billing</h2>
+          {isAdmin && (
+            <Link to={`/admin/billing`} className="text-sm font-semibold text-primary">
+              Full billing →
+            </Link>
+          )}
+        </div>
+        {billingError ? (
+          <p className="text-sm text-slate-500">Billing details are unavailable right now.</p>
+        ) : !billing ? (
+          <Spinner className="py-4" />
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <p className="text-xs text-slate-500">Outstanding</p>
+                <p className="text-lg font-bold text-red-600">{formatMoney(billing.outstandingCents, billing.currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Paid</p>
+                <p className="text-lg font-bold text-green-700">{formatMoney(billing.paidCents, billing.currency)}</p>
+              </div>
+            </div>
+
+            {billing.activePackages.length > 0 && (
+              <div>
+                <h3 className="mb-1 text-sm font-semibold text-slate-900">Packages</h3>
+                <div className="space-y-1">
+                  {billing.activePackages.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span>{p.packageName}</span>
+                      <span className="text-slate-600">
+                        {p.sessionsRemaining} / {p.sessionsTotal} sessions left
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {billing.activeSubscriptions.length > 0 && (
+              <div>
+                <h3 className="mb-1 text-sm font-semibold text-slate-900">Subscriptions</h3>
+                <div className="space-y-1">
+                  {billing.activeSubscriptions.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span>{s.planName}</span>
+                      <span className="text-slate-600">
+                        {s.nextBillingDate ? `Next billing ${formatDate(s.nextBillingDate)}` : formatMoney(s.amountCents)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="mb-1 text-sm font-semibold text-slate-900">Invoices</h3>
+              {billing.invoices.length === 0 ? (
+                <EmptyState>
+                  <p className="text-sm text-slate-500">No invoices yet</p>
+                </EmptyState>
+              ) : (
+                <div className="space-y-1">
+                  {billing.invoices.slice(0, 5).map((inv) => (
+                    <Link
+                      key={inv.id}
+                      to={isAdmin ? `/admin/billing/invoices/${inv.id}` : `/billing/invoices/${inv.id}`}
+                      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-sm hover:bg-slate-50"
+                    >
+                      <span className="truncate">{inv.invoiceNumber} — {inv.title}</span>
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="font-semibold">{formatMoney(inv.amountCents)}</span>
+                        <InvoiceStatus status={inv.status} />
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
 
       <ConfirmDialog
         open={confirmDelete}
