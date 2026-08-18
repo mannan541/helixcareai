@@ -45,6 +45,34 @@ export type Invoice = {
   sessionDurationMinutes?: number | null;
 };
 
+export type ChildPackageAssignment = {
+  id: string;
+  childId: string;
+  childName?: string;
+  packageId: string;
+  packageName?: string;
+  sessionsTotal: number;
+  sessionsRemaining: number;
+  amountCents: number;
+  currency: string;
+  status: string;
+  purchasedAt: string;
+  expiresAt: string | null;
+};
+
+export type ChildSubscriptionAssignment = {
+  id: string;
+  childId: string;
+  childName?: string;
+  planId: string;
+  planName?: string;
+  amountCents: number;
+  currency: string;
+  status: string;
+  startedAt: string;
+  nextBillingDate: string | null;
+};
+
 export type InvoicePayment = {
   id: string;
   amountCents: number;
@@ -125,6 +153,27 @@ export async function updatePackage(id: string, input: Partial<TherapyPackage>):
   return data.package;
 }
 
+export async function deletePackage(id: string): Promise<void> {
+  await api.delete(`/api/billing/packages/${id}`);
+}
+
+export async function listChildPackages(): Promise<ChildPackageAssignment[]> {
+  const { data } = await api.get<{ childPackages: ChildPackageAssignment[] }>('/api/billing/child-packages');
+  return data.childPackages;
+}
+
+export async function updateChildPackage(
+  id: string,
+  input: Partial<{ sessionsTotal: number; sessionsRemaining: number; amountCents: number; status: string; expiresAt: string | null }>
+): Promise<ChildPackageAssignment> {
+  const { data } = await api.patch<{ childPackage: ChildPackageAssignment }>(`/api/billing/child-packages/${id}`, input);
+  return data.childPackage;
+}
+
+export async function deleteChildPackage(id: string): Promise<void> {
+  await api.delete(`/api/billing/child-packages/${id}`);
+}
+
 export async function listPlans(): Promise<SubscriptionPlan[]> {
   const { data } = await api.get<{ plans: SubscriptionPlan[] }>('/api/billing/plans');
   return data.plans;
@@ -139,6 +188,42 @@ export async function createPlan(input: {
 }): Promise<SubscriptionPlan> {
   const { data } = await api.post<{ plan: SubscriptionPlan }>('/api/billing/plans', input);
   return data.plan;
+}
+
+export async function updatePlan(id: string, input: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
+  const { data } = await api.patch<{ plan: SubscriptionPlan }>(`/api/billing/plans/${id}`, {
+    name: input.name,
+    description: input.description,
+    intervalMonths: input.intervalMonths,
+    priceCents: input.priceCents,
+    sessionsIncluded: input.sessionsIncluded,
+    isActive: input.isActive,
+  });
+  return data.plan;
+}
+
+export async function deletePlan(id: string): Promise<void> {
+  await api.delete(`/api/billing/plans/${id}`);
+}
+
+export async function listChildSubscriptions(): Promise<ChildSubscriptionAssignment[]> {
+  const { data } = await api.get<{ childSubscriptions: ChildSubscriptionAssignment[] }>('/api/billing/child-subscriptions');
+  return data.childSubscriptions;
+}
+
+export async function updateChildSubscription(
+  id: string,
+  input: Partial<{ amountCents: number; status: string; nextBillingDate: string | null }>
+): Promise<ChildSubscriptionAssignment> {
+  const { data } = await api.patch<{ childSubscription: ChildSubscriptionAssignment }>(
+    `/api/billing/child-subscriptions/${id}`,
+    input
+  );
+  return data.childSubscription;
+}
+
+export async function deleteChildSubscription(id: string): Promise<void> {
+  await api.delete(`/api/billing/child-subscriptions/${id}`);
 }
 
 export async function listInvoices(params?: { childId?: string; status?: string }): Promise<Invoice[]> {

@@ -4,8 +4,18 @@ import {
   getOutstanding,
   listPackages,
   createPackage,
+  updatePackage,
+  deletePackage,
+  listChildPackages,
+  updateChildPackage,
+  deleteChildPackage,
   listPlans,
   createPlan,
+  updatePlan,
+  deletePlan,
+  listChildSubscriptions,
+  updateChildSubscription,
+  deleteChildSubscription,
   listInvoices,
   payInvoice,
   billSession,
@@ -15,6 +25,8 @@ import {
   type TherapyPackage,
   type SubscriptionPlan,
   type Invoice,
+  type ChildPackageAssignment,
+  type ChildSubscriptionAssignment,
 } from '../api/billing';
 import { listChildren } from '../api/children';
 import type { Child } from '../api/types';
@@ -28,8 +40,10 @@ import {
   PageTitle,
   btnPrimary,
   btnSecondary,
+  btnDanger,
   inputCls,
   StatusBadge,
+  ConfirmDialog,
 } from '../components/ui';
 import { formatDate, formatMoney, parseMoneyToCents } from '../utils/format';
 
@@ -64,6 +78,8 @@ export default function AdminBillingPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [unbilled, setUnbilled] = useState<Awaited<ReturnType<typeof listUnbilledSessions>>>([]);
+  const [childPackages, setChildPackages] = useState<ChildPackageAssignment[]>([]);
+  const [childSubscriptions, setChildSubscriptions] = useState<ChildSubscriptionAssignment[]>([]);
 
   const [pkgName, setPkgName] = useState('');
   const [pkgSessions, setPkgSessions] = useState('10');
@@ -77,6 +93,32 @@ export default function AdminBillingPage() {
   const [sessionAmount, setSessionAmount] = useState('150');
   const [busy, setBusy] = useState(false);
 
+  const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
+  const [editPkgName, setEditPkgName] = useState('');
+  const [editPkgSessions, setEditPkgSessions] = useState('');
+  const [editPkgPrice, setEditPkgPrice] = useState('');
+  const [editPkgActive, setEditPkgActive] = useState(true);
+
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editPlanName, setEditPlanName] = useState('');
+  const [editPlanMonths, setEditPlanMonths] = useState('');
+  const [editPlanPrice, setEditPlanPrice] = useState('');
+  const [editPlanActive, setEditPlanActive] = useState(true);
+
+  const [editingChildPkgId, setEditingChildPkgId] = useState<string | null>(null);
+  const [editChildPkgRemaining, setEditChildPkgRemaining] = useState('');
+  const [editChildPkgTotal, setEditChildPkgTotal] = useState('');
+  const [editChildPkgStatus, setEditChildPkgStatus] = useState('active');
+
+  const [editingChildSubId, setEditingChildSubId] = useState<string | null>(null);
+  const [editChildSubStatus, setEditChildSubStatus] = useState('active');
+  const [editChildSubAmount, setEditChildSubAmount] = useState('');
+  const [editChildSubNextBilling, setEditChildSubNextBilling] = useState('');
+
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: 'package' | 'plan' | 'childPackage' | 'childSubscription'; id: string; label: string } | null
+  >(null);
+
   const openInvoice = (invoice: Invoice, message: string) => {
     navigate(`/admin/billing/invoices/${invoice.id}`, { state: { successMessage: message } });
   };
@@ -87,13 +129,15 @@ export default function AdminBillingPage() {
     setError('');
     const failures: string[] = [];
 
-    const [outR, pkgR, planR, invR, unbR, childR] = await Promise.allSettled([
+    const [outR, pkgR, planR, invR, unbR, childR, childPkgR, childSubR] = await Promise.allSettled([
       getOutstanding(),
       listPackages(),
       listPlans(),
       listInvoices(),
       listUnbilledSessions(),
       listChildren(),
+      listChildPackages(),
+      listChildSubscriptions(),
     ]);
 
     if (outR.status === 'fulfilled') setOutstanding(outR.value);
@@ -123,6 +167,16 @@ export default function AdminBillingPage() {
     }
     if (childR.status === 'fulfilled') setChildren(childR.value.children);
     else failures.push(errorMessage(childR.reason));
+    if (childPkgR.status === 'fulfilled') setChildPackages(childPkgR.value);
+    else {
+      setChildPackages([]);
+      failures.push(errorMessage(childPkgR.reason));
+    }
+    if (childSubR.status === 'fulfilled') setChildSubscriptions(childSubR.value);
+    else {
+      setChildSubscriptions([]);
+      failures.push(errorMessage(childSubR.reason));
+    }
 
     if (failures.length > 0) {
       const unique = [...new Set(failures)];
@@ -170,6 +224,129 @@ export default function AdminBillingPage() {
       await load({ silent: true });
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEditPkg = (p: TherapyPackage) => {
+    setEditingPkgId(p.id);
+    setEditPkgName(p.name);
+    setEditPkgSessions(String(p.sessionCount));
+    setEditPkgPrice((p.priceCents / 100).toFixed(2));
+    setEditPkgActive(p.isActive);
+  };
+  const cancelEditPkg = () => setEditingPkgId(null);
+  const saveEditPkg = async (id: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await updatePackage(id, {
+        name: editPkgName,
+        sessionCount: parseInt(editPkgSessions, 10),
+        priceCents: parseMoneyToCents(editPkgPrice),
+        isActive: editPkgActive,
+      });
+      setEditingPkgId(null);
+      await load({ silent: true });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEditPlan = (p: SubscriptionPlan) => {
+    setEditingPlanId(p.id);
+    setEditPlanName(p.name);
+    setEditPlanMonths(String(p.intervalMonths));
+    setEditPlanPrice((p.priceCents / 100).toFixed(2));
+    setEditPlanActive(p.isActive);
+  };
+  const cancelEditPlan = () => setEditingPlanId(null);
+  const saveEditPlan = async (id: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await updatePlan(id, {
+        name: editPlanName,
+        intervalMonths: parseInt(editPlanMonths, 10),
+        priceCents: parseMoneyToCents(editPlanPrice),
+        isActive: editPlanActive,
+      });
+      setEditingPlanId(null);
+      await load({ silent: true });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEditChildPkg = (cp: ChildPackageAssignment) => {
+    setEditingChildPkgId(cp.id);
+    setEditChildPkgRemaining(String(cp.sessionsRemaining));
+    setEditChildPkgTotal(String(cp.sessionsTotal));
+    setEditChildPkgStatus(cp.status);
+  };
+  const cancelEditChildPkg = () => setEditingChildPkgId(null);
+  const saveEditChildPkg = async (id: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await updateChildPackage(id, {
+        sessionsRemaining: parseInt(editChildPkgRemaining, 10),
+        sessionsTotal: parseInt(editChildPkgTotal, 10),
+        status: editChildPkgStatus,
+      });
+      setEditingChildPkgId(null);
+      await load({ silent: true });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEditChildSub = (cs: ChildSubscriptionAssignment) => {
+    setEditingChildSubId(cs.id);
+    setEditChildSubStatus(cs.status);
+    setEditChildSubAmount((cs.amountCents / 100).toFixed(2));
+    setEditChildSubNextBilling(cs.nextBillingDate ?? '');
+  };
+  const cancelEditChildSub = () => setEditingChildSubId(null);
+  const saveEditChildSub = async (id: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      await updateChildSubscription(id, {
+        status: editChildSubStatus,
+        amountCents: parseMoneyToCents(editChildSubAmount),
+        nextBillingDate: editChildSubNextBilling || undefined,
+      });
+      setEditingChildSubId(null);
+      await load({ silent: true });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setBusy(true);
+    setError('');
+    try {
+      if (deleteTarget.kind === 'package') await deletePackage(deleteTarget.id);
+      else if (deleteTarget.kind === 'plan') await deletePlan(deleteTarget.id);
+      else if (deleteTarget.kind === 'childPackage') await deleteChildPackage(deleteTarget.id);
+      else if (deleteTarget.kind === 'childSubscription') await deleteChildSubscription(deleteTarget.id);
+      setDeleteTarget(null);
+      await load({ silent: true });
+    } catch (err) {
+      setError(errorMessage(err));
+      setDeleteTarget(null);
     } finally {
       setBusy(false);
     }
@@ -283,17 +460,61 @@ export default function AdminBillingPage() {
                     <p className="mt-1 text-slate-500">Create a session bundle (e.g. 10 sessions for 1,500).</p>
                   </EmptyState>
                 ) : (
-                  packages.map((p) => (
-                    <Card key={p.id}>
-                      <div className="flex justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{p.name}</p>
-                          <p className="text-sm text-slate-600">{p.sessionCount} sessions · {formatMoney(p.priceCents, p.currency)}</p>
+                  packages.map((p) =>
+                    editingPkgId === p.id ? (
+                      <Card key={p.id}>
+                        <div className="space-y-2">
+                          <Field label="Package name" required>
+                            <input className={inputCls} value={editPkgName} onChange={(e) => setEditPkgName(e.target.value)} />
+                          </Field>
+                          <div className="flex gap-2">
+                            <Field label="Sessions" required>
+                              <input type="number" min={1} className={inputCls} value={editPkgSessions} onChange={(e) => setEditPkgSessions(e.target.value)} />
+                            </Field>
+                            <Field label="Price" required>
+                              <input className={inputCls} value={editPkgPrice} onChange={(e) => setEditPkgPrice(e.target.value)} />
+                            </Field>
+                          </div>
+                          <label className="flex items-center gap-2 text-sm text-slate-700">
+                            <input type="checkbox" checked={editPkgActive} onChange={(e) => setEditPkgActive(e.target.checked)} />
+                            Active (assignable to children)
+                          </label>
+                          <div className="flex gap-2">
+                            <button type="button" className={btnPrimary} disabled={busy} onClick={() => saveEditPkg(p.id)}>
+                              Save
+                            </button>
+                            <button type="button" className={btnSecondary} onClick={cancelEditPkg}>
+                              Cancel
+                            </button>
+                          </div>
                         </div>
-                        {p.isActive ? <StatusBadge status="active" /> : <StatusBadge status="cancelled" />}
-                      </div>
-                    </Card>
-                  ))
+                      </Card>
+                    ) : (
+                      <Card key={p.id}>
+                        <div className="flex justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{p.name}</p>
+                            <p className="text-sm text-slate-600">{p.sessionCount} sessions · {formatMoney(p.priceCents, p.currency)}</p>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            {p.isActive ? <StatusBadge status="active" /> : <StatusBadge status="cancelled" />}
+                          </div>
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <button type="button" className={btnSecondary} onClick={() => startEditPkg(p)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className={btnDanger}
+                            onClick={() => setDeleteTarget({ kind: 'package', id: p.id, label: p.name })}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </Card>
+                    )
+                  )
                 )}
               </div>
               <Card className="lg:col-span-2">
@@ -333,6 +554,76 @@ export default function AdminBillingPage() {
                   </button>
                 </div>
               </Card>
+              <div className="space-y-2 lg:col-span-2">
+                <h2 className="font-bold">Assigned packages</h2>
+                {childPackages.length === 0 ? (
+                  <EmptyState>
+                    <p className="font-semibold text-slate-700">No packages assigned yet</p>
+                    <p className="mt-1 text-slate-500">Assign a package to a child above to see it here.</p>
+                  </EmptyState>
+                ) : (
+                  childPackages.map((cp) =>
+                    editingChildPkgId === cp.id ? (
+                      <Card key={cp.id}>
+                        <p className="font-semibold">
+                          {cp.childName} — {cp.packageName}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-end gap-2">
+                          <Field label="Sessions remaining">
+                            <input type="number" min={0} className={`${inputCls} w-32`} value={editChildPkgRemaining} onChange={(e) => setEditChildPkgRemaining(e.target.value)} />
+                          </Field>
+                          <Field label="Sessions total">
+                            <input type="number" min={1} className={`${inputCls} w-32`} value={editChildPkgTotal} onChange={(e) => setEditChildPkgTotal(e.target.value)} />
+                          </Field>
+                          <Field label="Status">
+                            <select className={inputCls} value={editChildPkgStatus} onChange={(e) => setEditChildPkgStatus(e.target.value)}>
+                              <option value="active">Active</option>
+                              <option value="expired">Expired</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </Field>
+                          <button type="button" className={btnPrimary} disabled={busy} onClick={() => saveEditChildPkg(cp.id)}>
+                            Save
+                          </button>
+                          <button type="button" className={btnSecondary} onClick={cancelEditChildPkg}>
+                            Cancel
+                          </button>
+                        </div>
+                      </Card>
+                    ) : (
+                      <Card key={cp.id} className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {cp.childName} — {cp.packageName}
+                          </p>
+                          <p className="text-sm text-slate-600">
+                            {cp.sessionsRemaining} / {cp.sessionsTotal} sessions remaining · {formatMoney(cp.amountCents, cp.currency)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={cp.status} />
+                          <button type="button" className={btnSecondary} onClick={() => startEditChildPkg(cp)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className={btnDanger}
+                            onClick={() =>
+                              setDeleteTarget({
+                                kind: 'childPackage',
+                                id: cp.id,
+                                label: `${cp.packageName} for ${cp.childName}`,
+                              })
+                            }
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </Card>
+                    )
+                  )
+                )}
+              </div>
             </div>
           )}
 
@@ -363,14 +654,61 @@ export default function AdminBillingPage() {
                     <p className="mt-1 text-slate-500">Create a monthly or term-based plan for recurring billing.</p>
                   </EmptyState>
                 ) : (
-                  plans.map((p) => (
-                    <Card key={p.id}>
-                      <p className="font-semibold">{p.name}</p>
-                      <p className="text-sm text-slate-600">
-                        Every {p.intervalMonths} mo · {formatMoney(p.priceCents, p.currency)}
-                      </p>
-                    </Card>
-                  ))
+                  plans.map((p) =>
+                    editingPlanId === p.id ? (
+                      <Card key={p.id}>
+                        <div className="space-y-2">
+                          <Field label="Plan name" required>
+                            <input className={inputCls} value={editPlanName} onChange={(e) => setEditPlanName(e.target.value)} />
+                          </Field>
+                          <div className="flex gap-2">
+                            <Field label="Interval (months)" required>
+                              <input type="number" min={1} className={inputCls} value={editPlanMonths} onChange={(e) => setEditPlanMonths(e.target.value)} />
+                            </Field>
+                            <Field label="Price" required>
+                              <input className={inputCls} value={editPlanPrice} onChange={(e) => setEditPlanPrice(e.target.value)} />
+                            </Field>
+                          </div>
+                          <label className="flex items-center gap-2 text-sm text-slate-700">
+                            <input type="checkbox" checked={editPlanActive} onChange={(e) => setEditPlanActive(e.target.checked)} />
+                            Active (assignable to children)
+                          </label>
+                          <div className="flex gap-2">
+                            <button type="button" className={btnPrimary} disabled={busy} onClick={() => saveEditPlan(p.id)}>
+                              Save
+                            </button>
+                            <button type="button" className={btnSecondary} onClick={cancelEditPlan}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </Card>
+                    ) : (
+                      <Card key={p.id}>
+                        <div className="flex justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{p.name}</p>
+                            <p className="text-sm text-slate-600">
+                              Every {p.intervalMonths} mo · {formatMoney(p.priceCents, p.currency)}
+                            </p>
+                          </div>
+                          {p.isActive ? <StatusBadge status="active" /> : <StatusBadge status="cancelled" />}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <button type="button" className={btnSecondary} onClick={() => startEditPlan(p)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className={btnDanger}
+                            onClick={() => setDeleteTarget({ kind: 'plan', id: p.id, label: p.name })}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </Card>
+                    )
+                  )
                 )}
               </div>
               <Card className="lg:col-span-2">
@@ -410,6 +748,77 @@ export default function AdminBillingPage() {
                   </button>
                 </div>
               </Card>
+              <div className="space-y-2 lg:col-span-2">
+                <h2 className="font-bold">Assigned subscriptions</h2>
+                {childSubscriptions.length === 0 ? (
+                  <EmptyState>
+                    <p className="font-semibold text-slate-700">No subscriptions assigned yet</p>
+                    <p className="mt-1 text-slate-500">Assign a plan to a child above to see it here.</p>
+                  </EmptyState>
+                ) : (
+                  childSubscriptions.map((cs) =>
+                    editingChildSubId === cs.id ? (
+                      <Card key={cs.id}>
+                        <p className="font-semibold">
+                          {cs.childName} — {cs.planName}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-end gap-2">
+                          <Field label="Status">
+                            <select className={inputCls} value={editChildSubStatus} onChange={(e) => setEditChildSubStatus(e.target.value)}>
+                              <option value="active">Active</option>
+                              <option value="paused">Paused</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </Field>
+                          <Field label="Amount">
+                            <input className={`${inputCls} w-32`} value={editChildSubAmount} onChange={(e) => setEditChildSubAmount(e.target.value)} />
+                          </Field>
+                          <Field label="Next billing date">
+                            <input type="date" className={inputCls} value={editChildSubNextBilling} onChange={(e) => setEditChildSubNextBilling(e.target.value)} />
+                          </Field>
+                          <button type="button" className={btnPrimary} disabled={busy} onClick={() => saveEditChildSub(cs.id)}>
+                            Save
+                          </button>
+                          <button type="button" className={btnSecondary} onClick={cancelEditChildSub}>
+                            Cancel
+                          </button>
+                        </div>
+                      </Card>
+                    ) : (
+                      <Card key={cs.id} className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {cs.childName} — {cs.planName}
+                          </p>
+                          <p className="text-sm text-slate-600">
+                            {formatMoney(cs.amountCents, cs.currency)}
+                            {cs.nextBillingDate ? ` · Next billing ${formatDate(cs.nextBillingDate)}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={cs.status} />
+                          <button type="button" className={btnSecondary} onClick={() => startEditChildSub(cs)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className={btnDanger}
+                            onClick={() =>
+                              setDeleteTarget({
+                                kind: 'childSubscription',
+                                id: cs.id,
+                                label: `${cs.planName} for ${cs.childName}`,
+                              })
+                            }
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </Card>
+                    )
+                  )
+                )}
+              </div>
             </div>
           )}
 
@@ -515,6 +924,20 @@ export default function AdminBillingPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this?"
+        message={
+          deleteTarget
+            ? `This will permanently delete "${deleteTarget.label}". This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

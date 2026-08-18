@@ -49,6 +49,46 @@ function invDto(i: billingService.InvoiceRow) {
   };
 }
 
+function childPackageDto(cp: billingService.ChildPackageRow | billingService.ChildPackageListRow) {
+  const withChild = cp as Partial<billingService.ChildPackageListRow>;
+  return {
+    id: cp.id,
+    childId: cp.child_id,
+    childName:
+      withChild.child_first_name != null
+        ? [withChild.child_first_name, withChild.child_last_name].filter(Boolean).join(' ')
+        : undefined,
+    packageId: cp.package_id,
+    packageName: withChild.package_name,
+    sessionsTotal: cp.sessions_total,
+    sessionsRemaining: cp.sessions_remaining,
+    amountCents: cp.amount_cents,
+    currency: cp.currency,
+    status: cp.status,
+    purchasedAt: cp.purchased_at,
+    expiresAt: cp.expires_at,
+  };
+}
+
+function childSubscriptionDto(cs: billingService.ChildSubscriptionRow | billingService.ChildSubscriptionListRow) {
+  const withChild = cs as Partial<billingService.ChildSubscriptionListRow>;
+  return {
+    id: cs.id,
+    childId: cs.child_id,
+    childName:
+      withChild.child_first_name != null
+        ? [withChild.child_first_name, withChild.child_last_name].filter(Boolean).join(' ')
+        : undefined,
+    planId: cs.plan_id,
+    planName: withChild.plan_name,
+    amountCents: cs.amount_cents,
+    currency: cs.currency,
+    status: cs.status,
+    startedAt: cs.started_at,
+    nextBillingDate: cs.next_billing_date,
+  };
+}
+
 function invListDto(i: billingService.InvoiceListRow) {
   return {
     ...invDto(i),
@@ -88,6 +128,19 @@ export async function updatePackage(req: Request, res: Response): Promise<void> 
   res.json({ package: pkgDto(row) });
 }
 
+export async function deletePackage(req: Request, res: Response): Promise<void> {
+  const result = await billingService.deletePackage(req.params.id);
+  if (result.inUse) {
+    res.status(409).json({ error: 'This package is assigned to one or more children and cannot be deleted. Deactivate it instead.' });
+    return;
+  }
+  if (!result.ok) {
+    res.status(404).json({ error: 'Package not found' });
+    return;
+  }
+  res.status(204).send();
+}
+
 export async function listPlans(req: Request, res: Response): Promise<void> {
   const rows = await billingService.listPlans(req.query.activeOnly === 'true');
   res.json({ plans: rows.map(planDto) });
@@ -113,6 +166,65 @@ export async function updatePlan(req: Request, res: Response): Promise<void> {
     return;
   }
   res.json({ plan: planDto(row) });
+}
+
+export async function deletePlan(req: Request, res: Response): Promise<void> {
+  const result = await billingService.deletePlan(req.params.id);
+  if (result.inUse) {
+    res.status(409).json({ error: 'This plan is assigned to one or more children and cannot be deleted. Deactivate it instead.' });
+    return;
+  }
+  if (!result.ok) {
+    res.status(404).json({ error: 'Plan not found' });
+    return;
+  }
+  res.status(204).send();
+}
+
+export async function listChildPackages(_req: Request, res: Response): Promise<void> {
+  const rows = await billingService.listChildPackages();
+  res.json({ childPackages: rows.map(childPackageDto) });
+}
+
+export async function updateChildPackage(req: Request, res: Response): Promise<void> {
+  const row = await billingService.updateChildPackage(req.params.id, req.body);
+  if (!row) {
+    res.status(404).json({ error: 'Package assignment not found' });
+    return;
+  }
+  res.json({ childPackage: childPackageDto(row) });
+}
+
+export async function deleteChildPackage(req: Request, res: Response): Promise<void> {
+  const ok = await billingService.deleteChildPackage(req.params.id);
+  if (!ok) {
+    res.status(404).json({ error: 'Package assignment not found' });
+    return;
+  }
+  res.status(204).send();
+}
+
+export async function listChildSubscriptions(_req: Request, res: Response): Promise<void> {
+  const rows = await billingService.listChildSubscriptions();
+  res.json({ childSubscriptions: rows.map(childSubscriptionDto) });
+}
+
+export async function updateChildSubscription(req: Request, res: Response): Promise<void> {
+  const row = await billingService.updateChildSubscription(req.params.id, req.body);
+  if (!row) {
+    res.status(404).json({ error: 'Subscription assignment not found' });
+    return;
+  }
+  res.json({ childSubscription: childSubscriptionDto(row) });
+}
+
+export async function deleteChildSubscription(req: Request, res: Response): Promise<void> {
+  const ok = await billingService.deleteChildSubscription(req.params.id);
+  if (!ok) {
+    res.status(404).json({ error: 'Subscription assignment not found' });
+    return;
+  }
+  res.status(204).send();
 }
 
 export async function listInvoices(req: Request, res: Response): Promise<void> {

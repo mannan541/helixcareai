@@ -1,6 +1,11 @@
 import { query, queryOne } from '../../config/database';
 import * as childrenService from '../children/children.service';
 
+/** Postgres foreign_key_violation error code. */
+function isForeignKeyViolation(err: unknown): boolean {
+  return (err as { code?: string })?.code === '23503';
+}
+
 export type PackageRow = {
   id: string;
   name: string;
@@ -95,6 +100,17 @@ export async function updatePackage(
   return rows[0] ?? null;
 }
 
+/** Delete a package template. Fails if it's assigned to any child (FK RESTRICT) — deactivate instead in that case. */
+export async function deletePackage(id: string): Promise<{ ok: boolean; inUse?: boolean }> {
+  try {
+    const result = await query('DELETE FROM therapy_packages WHERE id = $1 RETURNING id', [id]);
+    return { ok: result.length > 0 };
+  } catch (err) {
+    if (isForeignKeyViolation(err)) return { ok: false, inUse: true };
+    throw err;
+  }
+}
+
 // ——— Subscription plans ———
 
 export async function listPlans(activeOnly = false): Promise<PlanRow[]> {
@@ -159,6 +175,17 @@ export async function updatePlan(
     ]
   );
   return rows[0] ?? null;
+}
+
+/** Delete a subscription plan template. Fails if it's assigned to any child (FK RESTRICT) — deactivate instead in that case. */
+export async function deletePlan(id: string): Promise<{ ok: boolean; inUse?: boolean }> {
+  try {
+    const result = await query('DELETE FROM subscription_plans WHERE id = $1 RETURNING id', [id]);
+    return { ok: result.length > 0 };
+  } catch (err) {
+    if (isForeignKeyViolation(err)) return { ok: false, inUse: true };
+    throw err;
+  }
 }
 
 // ——— Invoices ———
@@ -388,6 +415,120 @@ export async function assignSubscriptionToChild(
   });
 
   return { subscription: rows[0] as Record<string, unknown>, invoice };
+}
+
+export type ChildPackageRow = {
+  id: string;
+  child_id: string;
+  package_id: string;
+  sessions_total: number;
+  sessions_remaining: number;
+  amount_cents: number;
+  currency: string;
+  status: string;
+  purchased_at: string;
+  expires_at: string | null;
+  assigned_by: string | null;
+};
+
+export type ChildPackageListRow = ChildPackageRow & {
+  child_first_name: string;
+  child_last_name: string;
+  package_name: string;
+};
+
+export type ChildSubscriptionRow = {
+  id: string;
+  child_id: string;
+  plan_id: string;
+  amount_cents: number;
+  currency: string;
+  status: string;
+  started_at: string;
+  next_billing_date: string | null;
+  assigned_by: string | null;
+};
+
+export type ChildSubscriptionListRow = ChildSubscriptionRow & {
+  child_first_name: string;
+  child_last_name: string;
+  plan_name: string;
+};
+
+/** All package assignments across all children (admin view). */
+export async function listChildPackages(): Promise<ChildPackageListRow[]> {
+  return query<ChildPackageListRow>(
+    `SELECT cp.*, c.first_name AS child_first_name, c.last_name AS child_last_name, p.name AS package_name
+     FROM child_packages cp
+     JOIN children c ON c.id = cp.child_id
+     JOIN therapy_packages p ON p.id = cp.package_id
+     ORDER BY cp.purchased_at DESC
+     LIMIT 200`
+  );
+}
+
+export async function updateChildPackage(
+  id: string,
+  data: Partial<{
+    sessionsTotal: number;
+    sessionsRemaining: number;
+    amountCents: number;
+    status: string;
+    expiresAt: string | null;
+  }>
+): Promise<ChildPackageRow | null> {
+  const rows = await query<ChildPackageRow>(
+    `UPDATE child_packages SET
+       sessions_total = COALESCE($2, sessions_total),
+       sessions_remaining = COALESCE($3, sessions_remaining),
+       amount_cents = COALESCE($4, amount_cents),
+       status = COALESCE($5, status),
+       expires_at = COALESCE($6, expires_at)
+     WHERE id = $1 RETURNING *`,
+    [id, data.sessionsTotal, data.sessionsRemaining, data.amountCents, data.status, data.expiresAt]
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteChildPackage(id: string): Promise<boolean> {
+  const result = await query('DELETE FROM child_packages WHERE id = $1 RETURNING id', [id]);
+  return result.length > 0;
+}
+
+/** All subscription assignments across all children (admin view). */
+export async function listChildSubscriptions(): Promise<ChildSubscriptionListRow[]> {
+  return query<ChildSubscriptionListRow>(
+    `SELECT cs.*, c.first_name AS child_first_name, c.last_name AS child_last_name, sp.name AS plan_name
+     FROM child_subscriptions cs
+     JOIN children c ON c.id = cs.child_id
+     JOIN subscription_plans sp ON sp.id = cs.plan_id
+     ORDER BY cs.started_at DESC
+     LIMIT 200`
+  );
+}
+
+export async function updateChildSubscription(
+  id: string,
+  data: Partial<{
+    amountCents: number;
+    status: string;
+    nextBillingDate: string | null;
+  }>
+): Promise<ChildSubscriptionRow | null> {
+  const rows = await query<ChildSubscriptionRow>(
+    `UPDATE child_subscriptions SET
+       amount_cents = COALESCE($2, amount_cents),
+       status = COALESCE($3, status),
+       next_billing_date = COALESCE($4, next_billing_date)
+     WHERE id = $1 RETURNING *`,
+    [id, data.amountCents, data.status, data.nextBillingDate]
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteChildSubscription(id: string): Promise<boolean> {
+  const result = await query('DELETE FROM child_subscriptions WHERE id = $1 RETURNING id', [id]);
+  return result.length > 0;
 }
 
 // ——— Account summaries ———

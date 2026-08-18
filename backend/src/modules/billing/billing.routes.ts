@@ -37,7 +37,33 @@ router.post(
   ]),
   billingController.createPackage
 );
-router.patch('/packages/:id', validate([param('id').isUUID()]), billingController.updatePackage);
+router.patch(
+  '/packages/:id',
+  validate([
+    param('id').isUUID(),
+    body('name').optional().trim().notEmpty(),
+    body('sessionCount').optional().isInt({ min: 1 }),
+    body('priceCents').optional().isInt({ min: 0 }),
+    body('isActive').optional().isBoolean(),
+  ]),
+  billingController.updatePackage
+);
+router.delete('/packages/:id', validate([param('id').isUUID()]), billingController.deletePackage);
+
+router.get('/child-packages', billingController.listChildPackages);
+router.patch(
+  '/child-packages/:id',
+  validate([
+    param('id').isUUID(),
+    body('sessionsTotal').optional().isInt({ min: 1 }),
+    body('sessionsRemaining').optional().isInt({ min: 0 }),
+    body('amountCents').optional().isInt({ min: 0 }),
+    body('status').optional().isIn(['active', 'expired', 'cancelled']),
+    body('expiresAt').optional({ nullable: true }).isISO8601(),
+  ]),
+  billingController.updateChildPackage
+);
+router.delete('/child-packages/:id', validate([param('id').isUUID()]), billingController.deleteChildPackage);
 
 router.get('/plans', billingController.listPlans);
 router.post(
@@ -49,7 +75,32 @@ router.post(
   ]),
   billingController.createPlan
 );
-router.patch('/plans/:id', validate([param('id').isUUID()]), billingController.updatePlan);
+router.patch(
+  '/plans/:id',
+  validate([
+    param('id').isUUID(),
+    body('name').optional().trim().notEmpty(),
+    body('intervalMonths').optional().isInt({ min: 1 }),
+    body('priceCents').optional().isInt({ min: 0 }),
+    body('sessionsIncluded').optional().isInt({ min: 0 }),
+    body('isActive').optional().isBoolean(),
+  ]),
+  billingController.updatePlan
+);
+router.delete('/plans/:id', validate([param('id').isUUID()]), billingController.deletePlan);
+
+router.get('/child-subscriptions', billingController.listChildSubscriptions);
+router.patch(
+  '/child-subscriptions/:id',
+  validate([
+    param('id').isUUID(),
+    body('amountCents').optional().isInt({ min: 0 }),
+    body('status').optional().isIn(['active', 'paused', 'cancelled']),
+    body('nextBillingDate').optional({ nullable: true }).isISO8601(),
+  ]),
+  billingController.updateChildSubscription
+);
+router.delete('/child-subscriptions/:id', validate([param('id').isUUID()]), billingController.deleteChildSubscription);
 
 router.get('/invoices', billingController.listInvoices);
 router.post(
