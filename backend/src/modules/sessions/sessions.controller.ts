@@ -189,10 +189,18 @@ export async function listComments(req: Request, res: Response): Promise<void> {
       sessionId: c.session_id,
       userId: c.user_id,
       comment: c.comment,
+      rating: c.rating,
       createdAt: c.created_at,
       user: { id: c._u_id, fullName: c._u_full_name, email: c._u_email },
     })),
   });
+}
+
+/** Only parents rate sessions — silently drop any rating from other roles rather than erroring, since it's an optional field. */
+function ratingForRole(role: string, rating: unknown): number | null {
+  if (role !== 'parent') return null;
+  const n = typeof rating === 'number' ? rating : parseInt(String(rating), 10);
+  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
 }
 
 export async function addComment(req: Request, res: Response): Promise<void> {
@@ -202,12 +210,17 @@ export async function addComment(req: Request, res: Response): Promise<void> {
     res.status(403).json({ error: 'Access denied' });
     return;
   }
-  const { comment } = req.body;
+  const { comment, rating } = req.body;
   if (!comment || typeof comment !== 'string' || !comment.trim()) {
     res.status(400).json({ error: 'Comment text is required' });
     return;
   }
-  const created = await sessionsService.addSessionComment(id, req.user!.userId, comment.trim());
+  const created = await sessionsService.addSessionComment(
+    id,
+    req.user!.userId,
+    comment.trim(),
+    ratingForRole(req.user!.role, rating)
+  );
   if (req.user!.role === 'parent') {
     notificationsEmit.notifyParentCommentOnSession({
       sessionId: id,
@@ -228,6 +241,7 @@ export async function addComment(req: Request, res: Response): Promise<void> {
       sessionId: created.session_id,
       userId: created.user_id,
       comment: created.comment,
+      rating: created.rating,
       createdAt: created.created_at,
       user: { id: created._u_id, fullName: created._u_full_name, email: created._u_email },
     },
@@ -241,12 +255,17 @@ export async function updateComment(req: Request, res: Response): Promise<void> 
     res.status(403).json({ error: 'Access denied' });
     return;
   }
-  const { comment } = req.body;
+  const { comment, rating } = req.body;
   if (!comment || typeof comment !== 'string' || !comment.trim()) {
     res.status(400).json({ error: 'Comment text is required' });
     return;
   }
-  const updated = await sessionsService.updateSessionComment(commentId, req.user!.userId, comment.trim());
+  const updated = await sessionsService.updateSessionComment(
+    commentId,
+    req.user!.userId,
+    comment.trim(),
+    ratingForRole(req.user!.role, rating)
+  );
   if (!updated) {
     res.status(404).json({ error: 'Comment not found or you can only edit your own notes' });
     return;
@@ -257,6 +276,7 @@ export async function updateComment(req: Request, res: Response): Promise<void> 
       sessionId: updated.session_id,
       userId: updated.user_id,
       comment: updated.comment,
+      rating: updated.rating,
       createdAt: updated.created_at,
       user: { id: updated._u_id, fullName: updated._u_full_name, email: updated._u_email },
     },

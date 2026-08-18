@@ -52,7 +52,7 @@ export async function ask(
     const { rows } = await childrenService.findByUserId(userId, role);
     const childIds = rows.map((c: childrenService.ChildRow) => c.id);
     await addLog(userId, null, 'user', question);
-    const answer = await ragService.askGlobalAssistant(childIds, question, { topK: 7 });
+    const answer = await ragService.askGlobalAssistant(childIds, question, { topK: 7, role });
     await addLog(userId, null, 'assistant', answer);
     return { answer };
   }

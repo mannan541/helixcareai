@@ -27,6 +27,35 @@ import { formatDate, formatDateTime } from '../utils/format';
 import SessionMetricsDisplay from '../components/SessionMetricsDisplay';
 import { getSessionMetricEntries } from '../utils/sessionMetrics';
 
+function StarRating({
+  value,
+  onChange,
+  readOnly,
+}: {
+  value: number | null;
+  onChange?: (v: number) => void;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={readOnly}
+          aria-label={`${n} star${n === 1 ? '' : 's'}`}
+          className={`text-lg leading-none ${readOnly ? 'cursor-default' : 'cursor-pointer'} ${
+            value != null && n <= value ? 'text-amber-400' : 'text-slate-300'
+          }`}
+          onClick={() => onChange?.(n)}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function SessionDetailPage() {
   const { childId, sessionId } = useParams<{ childId: string; sessionId: string }>();
   const { user } = useAuth();
@@ -34,6 +63,7 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [comments, setComments] = useState<SessionComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [newRating, setNewRating] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -86,9 +116,10 @@ export default function SessionDetailPage() {
     if (!newComment.trim()) return;
     setBusy(true);
     try {
-      const c = await addComment(sessionId, newComment.trim());
+      const c = await addComment(sessionId, newComment.trim(), isParent ? newRating : undefined);
       setComments((prev) => [...prev, c]);
       setNewComment('');
+      setNewRating(null);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -217,7 +248,10 @@ export default function SessionDetailPage() {
           {comments.map((c) => (
             <div key={c.id} className="rounded-lg bg-slate-50 p-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-900">{c.user.fullName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-900">{c.user.fullName}</p>
+                  {c.rating != null && <StarRating value={c.rating} readOnly />}
+                </div>
                 <span className="text-xs text-slate-400">{formatDateTime(c.createdAt)}</span>
               </div>
               {editingId === c.id ? (
@@ -281,16 +315,33 @@ export default function SessionDetailPage() {
           {comments.length === 0 && <p className="text-sm text-slate-500">No comments yet</p>}
         </div>
         {canComment && (
-          <form onSubmit={submitComment} className="mt-4 flex gap-2">
-            <input
-              className={`${inputCls} flex-1`}
-              placeholder="Add a comment…"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-            />
-            <button type="submit" className={btnPrimary} disabled={busy || !newComment.trim()}>
-              Send
-            </button>
+          <form onSubmit={submitComment} className="mt-4 space-y-2">
+            {isParent && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Rate this session (optional):</span>
+                <StarRating value={newRating} onChange={setNewRating} />
+                {newRating != null && (
+                  <button
+                    type="button"
+                    className="text-xs text-slate-400 hover:underline"
+                    onClick={() => setNewRating(null)}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                className={`${inputCls} flex-1`}
+                placeholder="Add a comment…"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+              />
+              <button type="submit" className={btnPrimary} disabled={busy || !newComment.trim()}>
+                Send
+              </button>
+            </div>
           </form>
         )}
       </Card>

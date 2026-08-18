@@ -6,8 +6,105 @@ import * as groqService from './groqService';
 import * as geminiService from './geminiService';
 import * as sessionContextService from './sessionContextService';
 import * as therapyEmbeddingStorage from './therapyEmbeddingStorage';
+import * as analyticsService from '../analytics/analytics.service';
 
 const DEFAULT_TOP_K = 5;
+const OPERATIONS_LOOKBACK_DAYS = 30;
+const MAX_OPERATIONS_THERAPISTS = 50;
+const MAX_OPERATIONS_BLOCK_CHARS = 4000;
+
+function formatTherapistAnalyticsForAI(rows: analyticsService.TherapistAnalytics[], windowLabel: string): string {
+  if (rows.length === 0) return `Therapist performance (${windowLabel}): no therapists found.`;
+  const top = [...rows].sort((a, b) => b.sessionsTotal - a.sessionsTotal).slice(0, MAX_OPERATIONS_THERAPISTS);
+  const line = (t: analyticsService.TherapistAnalytics): string =>
+    `- ${t.fullName}: sessions=${t.sessionsTotal} (completed=${t.sessionsCompleted}, cancelled=${t.sessionsCancelled}, pending=${t.sessionsPending}, approved=${t.sessionsApproved}), ` +
+    `utilization=${t.utilizationPct != null ? `${t.utilizationPct}%` : 'n/a'}, ` +
+    `documentation=${t.documentationCompletionPct != null ? `${t.documentationCompletionPct}%` : 'n/a'}, ` +
+    `avgDuration=${t.avgSessionDurationMinutes != null ? `${t.avgSessionDurationMinutes}min` : 'n/a'}, ` +
+    `childrenAssigned=${t.childrenAssigned}, goalsUpdated=${t.goalsUpdatedPct != null ? `${t.goalsUpdatedPct}%` : 'n/a'}, ` +
+    `parentFeedback=${t.parentFeedbackAvg != null ? `${t.parentFeedbackAvg}/5 (${t.parentFeedbackCount} ratings)` : 'no ratings'}`;
+  return `Therapist performance (${windowLabel}):\n` + top.map(line).join('\n');
+}
+
+function formatClinicSummaryForAI(summary: analyticsService.ClinicSummary, windowLabel: string): string {
+  const revenue = (summary.revenueCents / 100).toFixed(2);
+  return (
+    `Clinic summary (${windowLabel}):\n` +
+    `- Total appointments: ${summary.totalAppointments}\n` +
+    `- Completed sessions: ${summary.totalSessionsCompleted}\n` +
+    `- Cancellations: ${summary.totalCancellations}\n` +
+    `- Revenue (paid invoices): ${revenue} ${summary.currency}\n` +
+    `- Active children: ${summary.childrenActive}`
+  );
+}
+
+function formatMissingNotesForAI(rows: analyticsService.MissingNotesSession[]): string | null {
+  if (rows.length === 0) return null;
+  const sample = rows.slice(0, 10);
+  return (
+    `Sessions missing notes/documentation (showing ${sample.length} of ${rows.length}):\n` +
+    sample
+      .map((s) => `- ${s.childName}, ${s.sessionDate}${s.therapistName ? `, therapist: ${s.therapistName}` : ''}`)
+      .join('\n')
+  );
+}
+
+function formatStaleGoalsForAI(rows: analyticsService.StaleGoalChild[]): string | null {
+  if (rows.length === 0) return null;
+  const sample = rows.slice(0, 10);
+  return (
+    `Children with no recent goal-related progress in the last ${OPERATIONS_LOOKBACK_DAYS} days (showing ${sample.length} of ${rows.length}):\n` +
+    sample.map((c) => `- ${c.childName} (therapist: ${c.therapistName || 'unassigned'})`).join('\n')
+  );
+}
+
+/**
+ * Build the clinic operations summary block for global-mode chat. Admin and therapist roles both get
+ * therapist-level performance data (matching their existing symmetric clinic-wide child visibility);
+ * only admin gets financial data, matching the billing module's own admin-only gating. Two windows
+ * (last 30 days + all-time) are included so relative questions like "this month" have some grounding —
+ * this is not true date-range NLU, just a best-effort recency hint.
+ */
+async function buildOperationsSummary(role: string): Promise<string | null> {
+  if (role === 'parent') return null;
+  try {
+    const today = new Date();
+    const toStr = today.toISOString().slice(0, 10);
+    const fromStr = new Date(today.getTime() - OPERATIONS_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
+
+    const [recentTherapists, allTimeTherapists, missingNotes, staleGoals] = await Promise.all([
+      analyticsService.getTherapistAnalytics({ from: fromStr, to: toStr }),
+      analyticsService.getTherapistAnalytics({}),
+      analyticsService.getSessionsMissingNotes({ limit: 10 }),
+      analyticsService.getStaleGoalChildren({}),
+    ]);
+
+    let block = `Today's date: ${toStr}\n\n`;
+    block += formatTherapistAnalyticsForAI(recentTherapists, `last ${OPERATIONS_LOOKBACK_DAYS} days`);
+    block += '\n\n' + formatTherapistAnalyticsForAI(allTimeTherapists, 'all-time');
+    const missingBlock = formatMissingNotesForAI(missingNotes);
+    if (missingBlock) block += '\n\n' + missingBlock;
+    const staleBlock = formatStaleGoalsForAI(staleGoals);
+    if (staleBlock) block += '\n\n' + staleBlock;
+
+    if (role === 'admin') {
+      const [recentClinic, allTimeClinic] = await Promise.all([
+        analyticsService.getClinicSummary({ from: fromStr, to: toStr }),
+        analyticsService.getClinicSummary({}),
+      ]);
+      block += '\n\n' + formatClinicSummaryForAI(recentClinic, `last ${OPERATIONS_LOOKBACK_DAYS} days`);
+      block += '\n\n' + formatClinicSummaryForAI(allTimeClinic, 'all-time');
+    }
+
+    if (block.length > MAX_OPERATIONS_BLOCK_CHARS) {
+      block = block.slice(0, MAX_OPERATIONS_BLOCK_CHARS) + '\n[...truncated for length]';
+    }
+    return block;
+  } catch (err) {
+    console.error('[ragService] buildOperationsSummary failed:', err);
+    return null;
+  }
+}
 
 /**
  * Format child record as a text profile for the AI so it can answer questions about
@@ -147,7 +244,7 @@ export async function askChildAssistant(
 export async function askGlobalAssistant(
   childIds: string[],
   question: string,
-  options: { topK?: number } = {}
+  options: { topK?: number; role?: string } = {}
 ): Promise<string> {
   const trimmedQuestion = question.trim();
   if (!trimmedQuestion) throw new Error('Question cannot be empty');
@@ -199,6 +296,13 @@ export async function askGlobalAssistant(
     }
   } catch (e) {
     // If embedding fails, user still gets answer from children names list
+  }
+
+  if (options.role) {
+    const operationsSummary = await buildOperationsSummary(options.role);
+    if (operationsSummary) {
+      context += '\n\n==========\n\n' + operationsSummary;
+    }
   }
 
   const llmOptions = { childProfile: 'Global Assistant Mode: Answering based on all managed children and clinic data.' };

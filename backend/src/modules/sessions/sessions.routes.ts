@@ -59,7 +59,11 @@ router.get(
 
 router.post(
   '/:id/comments',
-  validate([param('id').isUUID(), body('comment').isString().notEmpty().trim()]),
+  validate([
+    param('id').isUUID(),
+    body('comment').isString().notEmpty().trim(),
+    body('rating').optional({ nullable: true }).isInt({ min: 1, max: 5 }),
+  ]),
   sessionsController.addComment
 );
 
@@ -69,6 +73,7 @@ router.patch(
     param('id').isUUID(),
     param('commentId').isUUID(),
     body('comment').isString().notEmpty().trim(),
+    body('rating').optional({ nullable: true }).isInt({ min: 1, max: 5 }),
   ]),
   sessionsController.updateComment
 );

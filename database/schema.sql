@@ -776,3 +776,11 @@ CREATE TRIGGER subscription_plans_updated_at BEFORE UPDATE ON subscription_plans
 DROP TRIGGER IF EXISTS invoices_updated_at ON invoices;
 CREATE TRIGGER invoices_updated_at BEFORE UPDATE ON invoices
   FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- ============== PARENT SESSION RATING (feeds therapist analytics "parent feedback") ==============
+-- Parents may optionally rate a session 1-5 alongside their comment; therapists/admins never set this.
+DO $$
+BEGIN
+  ALTER TABLE session_comments ADD COLUMN rating SMALLINT CHECK (rating IS NULL OR rating BETWEEN 1 AND 5);
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;

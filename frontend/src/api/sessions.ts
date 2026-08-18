@@ -48,17 +48,18 @@ export async function listComments(sessionId: string): Promise<SessionComment[]>
   return data.comments;
 }
 
-export async function addComment(sessionId: string, comment: string): Promise<SessionComment> {
-  const { data } = await api.post(`/api/sessions/${sessionId}/comments`, { comment });
+export async function addComment(sessionId: string, comment: string, rating?: number | null): Promise<SessionComment> {
+  const { data } = await api.post(`/api/sessions/${sessionId}/comments`, { comment, rating });
   return data.comment;
 }
 
 export async function updateComment(
   sessionId: string,
   commentId: string,
-  comment: string
+  comment: string,
+  rating?: number | null
 ): Promise<SessionComment> {
-  const { data } = await api.patch(`/api/sessions/${sessionId}/comments/${commentId}`, { comment });
+  const { data } = await api.patch(`/api/sessions/${sessionId}/comments/${commentId}`, { comment, rating });
   return data.comment;
 }
 

@@ -279,6 +279,7 @@ export type SessionCommentRow = {
   session_id: string;
   user_id: string;
   comment: string;
+  rating: number | null;
   created_at: string;
 };
 
@@ -291,11 +292,12 @@ export type SessionCommentWithUserRow = SessionCommentRow & {
 export async function addSessionComment(
   sessionId: string,
   userId: string,
-  comment: string
+  comment: string,
+  rating?: number | null
 ): Promise<SessionCommentWithUserRow> {
   const rows = await query<SessionCommentRow>(
-    `INSERT INTO session_comments (session_id, user_id, comment) VALUES ($1, $2, $3) RETURNING *`,
-    [sessionId, userId, comment]
+    `INSERT INTO session_comments (session_id, user_id, comment, rating) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [sessionId, userId, comment, rating ?? null]
   );
   const row = rows[0];
   const userRows = await query<{ id: string; full_name: string; email: string }>(
@@ -313,7 +315,7 @@ export async function addSessionComment(
 
 export async function listSessionComments(sessionId: string): Promise<SessionCommentWithUserRow[]> {
   const rows = await query<SessionCommentWithUserRow>(
-    `SELECT c.id, c.session_id, c.user_id, c.comment, c.created_at,
+    `SELECT c.id, c.session_id, c.user_id, c.comment, c.rating, c.created_at,
        u.id AS _u_id, u.full_name AS _u_full_name, u.email AS _u_email
      FROM session_comments c
      JOIN users u ON c.user_id = u.id
@@ -325,7 +327,7 @@ export async function listSessionComments(sessionId: string): Promise<SessionCom
 
 export async function findCommentById(commentId: string): Promise<SessionCommentRow | null> {
   const rows = await query<SessionCommentRow>(
-    'SELECT id, session_id, user_id, comment, created_at FROM session_comments WHERE id = $1',
+    'SELECT id, session_id, user_id, comment, rating, created_at FROM session_comments WHERE id = $1',
     [commentId]
   );
   return rows[0] ?? null;
@@ -335,13 +337,14 @@ export async function findCommentById(commentId: string): Promise<SessionComment
 export async function updateSessionComment(
   commentId: string,
   userId: string,
-  comment: string
+  comment: string,
+  rating?: number | null
 ): Promise<SessionCommentWithUserRow | null> {
   const existing = await findCommentById(commentId);
   if (!existing || existing.user_id !== userId) return null;
   const rows = await query<SessionCommentRow>(
-    `UPDATE session_comments SET comment = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3 RETURNING *`,
-    [comment.trim(), userId, commentId]
+    `UPDATE session_comments SET comment = $1, rating = COALESCE($2, rating), updated_at = NOW(), updated_by = $3 WHERE id = $4 RETURNING *`,
+    [comment.trim(), rating ?? null, userId, commentId]
   );
   const row = rows[0];
   if (!row) return null;

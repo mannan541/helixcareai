@@ -83,6 +83,7 @@ export type SessionComment = {
   sessionId: string;
   userId: string;
   comment: string;
+  rating: number | null;
   createdAt: string;
   user: { id: string; fullName: string; email: string };
 };

@@ -29,6 +29,7 @@ import AssessmentReportPage from './pages/AssessmentReportPage';
 import ResourceLibraryPage from './pages/ResourceLibraryPage';
 import ChildResourcesPage from './pages/ChildResourcesPage';
 import AdminBillingPage from './pages/AdminBillingPage';
+import TherapistAnalyticsPage from './pages/TherapistAnalyticsPage';
 import ParentBillingPage from './pages/ParentBillingPage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import UsersListPage from './pages/UsersListPage';
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="/billing" element={<ParentBillingPage />} />
             <Route path="/billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
             <Route path="/admin/billing" element={<AdminBillingPage />} />
+            <Route path="/admin/therapist-analytics" element={<TherapistAnalyticsPage />} />
             <Route path="/admin/billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
             <Route path="/admin/assessments" element={<AdminAssessmentsPage />} />
             <Route path="/admin/assessments/conduct/:typeId" element={<AssessmentConductPage />} />

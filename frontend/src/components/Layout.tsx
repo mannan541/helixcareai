@@ -15,6 +15,7 @@ function navItemsFor(role: string): NavItem[] {
     items.push({ to: '/users', label: 'Users', icon: '👥' });
     items.push({ to: '/admin/assessments', label: 'Assessments', icon: '📊' });
     items.push({ to: '/admin/billing', label: 'Billing', icon: '💳' });
+    items.push({ to: '/admin/therapist-analytics', label: 'Therapist Analytics', icon: '📈' });
     items.push({ to: '/resources', label: 'Resource Library', icon: '📚' });
     items.push({ to: '/admin/appointments', label: 'Appointments', icon: '📅' });
     items.push({ to: '/admin/slots', label: 'Manage Slots', icon: '🕒' });

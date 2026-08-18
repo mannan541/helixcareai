@@ -26,9 +26,9 @@ export const env = {
   EMBEDDING_DIMENSION: parseInt(process.env.EMBEDDING_DIMENSION ?? '768', 10),
   /** Groq Cloud API for RAG LLM (primary). Get key: https://console.groq.com */
   GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
-  GROQ_MODEL: process.env.GROQ_MODEL ?? 'llama-3.1-8b-instant',
+  GROQ_MODEL: process.env.GROQ_MODEL ?? 'groq/compound-mini',
   /** Google Gemini API for RAG LLM and Embeddings. Get key: https://aistudio.google.com/apikey */
   GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? '',
-  GEMINI_MODEL: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
+  GEMINI_MODEL: process.env.GEMINI_MODEL ?? 'gemini-3.6-flash',
   GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL ?? 'gemini-embedding-001',
 } as const;
