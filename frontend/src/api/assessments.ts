@@ -57,9 +57,15 @@ export async function getAssessmentTemplate(typeId: string): Promise<AssessmentT
   return data.template;
 }
 
-export async function listRecentAssessments(limit = 20): Promise<ChildAssessment[]> {
+export async function listRecentAssessments(params?: {
+  limit?: number;
+  from?: string;
+  to?: string;
+  type?: string;
+  q?: string;
+}): Promise<ChildAssessment[]> {
   const { data } = await api.get<{ assessments: ChildAssessment[] }>('/api/assessments/recent', {
-    params: { limit },
+    params: { limit: params?.limit ?? 50, ...params },
   });
   return data.assessments;
 }

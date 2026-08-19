@@ -40,8 +40,14 @@ export async function getTemplateByType(req: Request, res: Response): Promise<vo
 }
 
 export async function listRecent(req: Request, res: Response): Promise<void> {
-  const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 100);
-  const rows = await assessmentsService.listRecent(req.user!.userId, req.user!.role, limit);
+  const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 200);
+  const rows = await assessmentsService.listRecent(req.user!.userId, req.user!.role, {
+    limit,
+    from: req.query.from as string | undefined,
+    to: req.query.to as string | undefined,
+    type: req.query.type as string | undefined,
+    q: req.query.q as string | undefined,
+  });
   res.json({ assessments: rows.map(toDto) });
 }
 

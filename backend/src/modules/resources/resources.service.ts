@@ -170,6 +170,10 @@ export async function update(
     throw new Error('File is too large. Maximum upload size is 4 MB.');
   }
 
+  // Replacing the file: drop the old stored blob once the new one is saved.
+  const oldFileUrl =
+    data.fileUrl && data.fileUrl !== existing.file_url ? existing.file_url : null;
+
   const rows = await query<TherapyResourceRow>(
     `UPDATE therapy_resources SET
        title = COALESCE($2, title),
@@ -194,6 +198,9 @@ export async function update(
       data.tags,
     ]
   );
+  if (oldFileUrl) {
+    await deleteStoredFile(oldFileUrl);
+  }
   return rows[0] ?? null;
 }
 

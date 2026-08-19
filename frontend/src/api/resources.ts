@@ -113,6 +113,38 @@ export async function createResourceWithFile(
   return createResource(input);
 }
 
+export async function updateResourceWithFile(
+  id: string,
+  input: {
+    title: string;
+    description?: string;
+    category: ResourceCategory;
+    content?: string;
+  },
+  file?: File | null
+): Promise<TherapyResource> {
+  if (file && file.size > MAX_FILE_BYTES) {
+    throw new Error('File is too large. Maximum upload size is 4 MB.');
+  }
+  if (file) {
+    const form = new FormData();
+    form.append('title', input.title);
+    form.append('category', input.category);
+    form.append('description', input.description ?? '');
+    form.append('content', input.content?.trim() ?? '');
+    form.append('file', file);
+    const { data } = await api.patch<{ resource: TherapyResource }>(`/api/resources/${id}/upload`, form);
+    return data.resource;
+  }
+  const { data } = await api.patch<{ resource: TherapyResource }>(`/api/resources/${id}`, {
+    title: input.title,
+    description: input.description ?? '',
+    category: input.category,
+    content: input.content?.trim() ?? '',
+  });
+  return data.resource;
+}
+
 export async function deleteResource(id: string): Promise<void> {
   await api.delete(`/api/resources/${id}`);
 }

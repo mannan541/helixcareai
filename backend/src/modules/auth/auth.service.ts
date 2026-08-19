@@ -83,7 +83,13 @@ export async function verifyUserPassword(userId: string, password: string): Prom
   return verifyPassword(password, row.password_hash);
 }
 
-export type UserListItem = { id: string; email: string; full_name: string; role: string; title: string | null; approved_at: string | null; disabled_at: string | null; deleted_at: string | null; mobile_number: string | null; show_mobile_to_parents: boolean };
+export type UserListItem = { id: string; email: string; full_name: string; role: string; title: string | null; approved_at: string | null; disabled_at: string | null; deleted_at: string | null; mobile_number: string | null; show_mobile_to_parents: boolean; child_names: string[] | null };
+
+/** Correlated subquery: names of children linked to this user (only non-empty for parent role). */
+const CHILD_NAMES_SUBQUERY = `(
+  SELECT array_agg(c.first_name || ' ' || c.last_name ORDER BY c.first_name)
+  FROM children c WHERE c.user_id = users.id AND c.deleted_at IS NULL
+) AS child_names`;
 
 const SORT_COLUMNS = ['full_name', 'email', 'role', 'approved_at', 'disabled_at', 'deleted_at'] as const;
 type SortColumn = (typeof SORT_COLUMNS)[number];
@@ -128,7 +134,7 @@ export async function findUsers(opts: {
   const limitIdx = params.length + 1;
   const offsetIdx = params.length + 2;
   const users = await query<UserListItem>(
-    `SELECT id, email, full_name, role, title, approved_at, disabled_at, NULL::timestamptz AS deleted_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents FROM users ${where} ${orderClause(sortBy, sortOrder)} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    `SELECT id, email, full_name, role, title, approved_at, disabled_at, NULL::timestamptz AS deleted_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents, ${CHILD_NAMES_SUBQUERY} FROM users ${where} ${orderClause(sortBy, sortOrder)} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     [...params, limit, offset]
   );
   return { users, total };
@@ -165,7 +171,7 @@ export async function findUsersArchived(opts: {
   const limitIdx = params.length + 1;
   const offsetIdx = params.length + 2;
   const users = await query<UserListItem>(
-    `SELECT id, email, full_name, role, title, approved_at, disabled_at, deleted_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents FROM users ${where} ${orderClause(sortBy, sortOrder)} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    `SELECT id, email, full_name, role, title, approved_at, disabled_at, deleted_at, mobile_number, COALESCE(show_mobile_to_parents, false) AS show_mobile_to_parents, ${CHILD_NAMES_SUBQUERY} FROM users ${where} ${orderClause(sortBy, sortOrder)} LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
     [...params, limit, offset]
   );
   return { users, total };

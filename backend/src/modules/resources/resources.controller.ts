@@ -128,6 +128,48 @@ export async function create(req: Request, res: Response): Promise<void> {
   }
 }
 
+/** Edit a resource, optionally replacing its file (multipart — same upload path as create). */
+export async function updateWithFile(req: Request, res: Response): Promise<void> {
+  const { title, description, category, content } = req.body as Record<string, string>;
+  if (category && !resourcesService.isValidCategory(category)) {
+    res.status(400).json({ error: 'Invalid resource category' });
+    return;
+  }
+  const file = req.file;
+  let fileUrl: string | undefined;
+  let fileName: string | undefined;
+  let mimeType: string | undefined;
+  if (file) {
+    try {
+      fileUrl = await uploadResourceFile(file.buffer, file.originalname, file.mimetype);
+      fileName = file.originalname;
+      mimeType = file.mimetype || 'application/octet-stream';
+    } catch (uploadErr: unknown) {
+      res.status(503).json({ error: (uploadErr as Error).message });
+      return;
+    }
+  }
+  try {
+    const row = await resourcesService.update(req.params.id, {
+      title,
+      description,
+      category: category as resourcesService.ResourceCategory | undefined,
+      fileUrl,
+      fileName,
+      mimeType,
+      content,
+    });
+    if (!row) {
+      res.status(404).json({ error: 'Resource not found' });
+      return;
+    }
+    const withCreator = await resourcesService.findById(row.id);
+    res.json({ resource: toResourceDto(withCreator ?? row) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+}
+
 export async function update(req: Request, res: Response): Promise<void> {
   const { title, description, category, fileUrl, fileName, mimeType, content, tags } = req.body;
   if (category && !resourcesService.isValidCategory(category)) {

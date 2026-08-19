@@ -11,6 +11,7 @@ export type User = {
   approvedAt?: string | null;
   disabledAt?: string | null;
   childIds?: string[];
+  childNames?: string[];
 };
 
 export type Child = {

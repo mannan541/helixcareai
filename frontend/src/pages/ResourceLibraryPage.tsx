@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   listResources,
   createResourceWithFile,
+  updateResourceWithFile,
   deleteResource,
   assignResource,
   resolveResourceFile,
@@ -66,6 +67,7 @@ export default function ResourceLibraryPage() {
   const [listRefreshing, setListRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [editTarget, setEditTarget] = useState<TherapyResource | null>(null);
   const [assignTarget, setAssignTarget] = useState<TherapyResource | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TherapyResource | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -111,25 +113,63 @@ export default function ResourceLibraryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
-  const submitAdd = async (e: FormEvent) => {
+  const closeForm = () => {
+    setShowAdd(false);
+    setEditTarget(null);
+    setFormTitle('');
+    setFormDesc('');
+    setFormContent('');
+    setFormFile(null);
+  };
+
+  const startAdd = () => {
+    setEditTarget(null);
+    setFormTitle('');
+    setFormDesc('');
+    setFormCategory('worksheet');
+    setFormContent('');
+    setFormFile(null);
+    setShowAdd(true);
+  };
+
+  const startEdit = (r: TherapyResource) => {
+    setEditTarget(r);
+    setFormTitle(r.title);
+    setFormDesc(r.description ?? '');
+    setFormCategory(r.category);
+    setFormContent(r.content ?? '');
+    setFormFile(null);
+    setShowAdd(true);
+  };
+
+  const submitForm = async (e: FormEvent) => {
     e.preventDefault();
     setFormBusy(true);
     setError('');
     try {
-      await createResourceWithFile(
-        {
-          title: formTitle,
-          description: formDesc || undefined,
-          category: formCategory,
-          content: formContent.trim() || undefined,
-        },
-        formFile
-      );
-      setShowAdd(false);
-      setFormTitle('');
-      setFormDesc('');
-      setFormContent('');
-      setFormFile(null);
+      if (editTarget) {
+        await updateResourceWithFile(
+          editTarget.id,
+          {
+            title: formTitle,
+            description: formDesc || undefined,
+            category: formCategory,
+            content: formContent.trim() || undefined,
+          },
+          formFile
+        );
+      } else {
+        await createResourceWithFile(
+          {
+            title: formTitle,
+            description: formDesc || undefined,
+            category: formCategory,
+            content: formContent.trim() || undefined,
+          },
+          formFile
+        );
+      }
+      closeForm();
       await loadResources({ silent: true });
     } catch (err) {
       setError(errorMessage(err));
@@ -173,7 +213,7 @@ export default function ResourceLibraryPage() {
       <PageTitle
         actions={
           canManage && (
-            <button type="button" className={btnPrimary} onClick={() => setShowAdd((v) => !v)}>
+            <button type="button" className={btnPrimary} onClick={() => (showAdd ? closeForm() : startAdd())}>
               {showAdd ? 'Close form' : '+ Add resource'}
             </button>
           )
@@ -226,8 +266,8 @@ export default function ResourceLibraryPage() {
 
       {showAdd && canManage && (
         <Card>
-          <h2 className="mb-4 font-bold">Add resource</h2>
-          <form onSubmit={submitAdd} className="space-y-4">
+          <h2 className="mb-4 font-bold">{editTarget ? `Edit resource — ${editTarget.title}` : 'Add resource'}</h2>
+          <form onSubmit={submitForm} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Title" required>
                 <input className={inputCls} value={formTitle} onChange={(e) => setFormTitle(e.target.value)} required />
@@ -245,7 +285,7 @@ export default function ResourceLibraryPage() {
             <Field label="Description">
               <textarea className={`${inputCls} min-h-16`} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
             </Field>
-            <Field label="Upload file (PDF, image — max 4 MB)">
+            <Field label={editTarget ? 'Replace file (optional — max 4 MB)' : 'Upload file (PDF, image — max 4 MB)'}>
               <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary-light/40 p-5">
                 <input
                   id="resource-file-input"
@@ -268,6 +308,11 @@ export default function ResourceLibraryPage() {
                       ({(formFile.size / (1024 * 1024)).toFixed(2)} MB)
                     </span>
                   </p>
+                ) : editTarget ? (
+                  <p className="mt-3 text-sm text-slate-500">
+                    {editTarget.fileName ? `Current file: ${editTarget.fileName}. ` : ''}
+                    Leave empty to keep the current file.
+                  </p>
                 ) : (
                   <p className="mt-3 text-sm text-slate-500">No file selected yet</p>
                 )}
@@ -283,9 +328,16 @@ export default function ResourceLibraryPage() {
                 />
               </Field>
             )}
-            <button type="submit" className={btnPrimary} disabled={formBusy}>
-              {formBusy ? 'Uploading…' : 'Save to library'}
-            </button>
+            <div className="flex gap-2">
+              <button type="submit" className={btnPrimary} disabled={formBusy}>
+                {formBusy ? (editTarget ? 'Updating…' : 'Uploading…') : editTarget ? 'Update resource' : 'Save to library'}
+              </button>
+              {editTarget && (
+                <button type="button" className={btnSecondary} onClick={closeForm}>
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
         </Card>
       )}
@@ -302,7 +354,7 @@ export default function ResourceLibraryPage() {
               : 'Upload your first PDF, worksheet, or therapy material to get started.'}
           </p>
           {canManage && (
-            <button type="button" className={`${btnPrimary} mt-4`} onClick={() => setShowAdd(true)}>
+            <button type="button" className={`${btnPrimary} mt-4`} onClick={startAdd}>
               + Add your first resource
             </button>
           )}
@@ -334,6 +386,11 @@ export default function ResourceLibraryPage() {
                 {canManage && (
                   <button type="button" className={btnPrimary} onClick={() => setAssignTarget(r)}>
                     Assign to child
+                  </button>
+                )}
+                {canManage && (
+                  <button type="button" className={btnSecondary} onClick={() => startEdit(r)}>
+                    Edit
                   </button>
                 )}
                 {isAdmin && (

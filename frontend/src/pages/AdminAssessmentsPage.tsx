@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listAssessmentTemplates, listRecentAssessments, type AssessmentTemplateSummary, type ChildAssessment } from '../api/assessments';
 import { errorMessage } from '../api/client';
-import { Card, Spinner, ErrorMessage, PageTitle, btnPrimary } from '../components/ui';
+import { Card, Field, Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary, btnSecondary, inputCls } from '../components/ui';
 import { formatDate } from '../utils/format';
 
 const TYPE_ICONS: Record<string, string> = {
@@ -17,25 +17,60 @@ export default function AdminAssessmentsPage() {
   const [templates, setTemplates] = useState<AssessmentTemplateSummary[]>([]);
   const [recent, setRecent] = useState<ChildAssessment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const load = async () => {
-    setLoading(true);
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterQ, setFilterQ] = useState('');
+
+  const load = async (opts?: { silent?: boolean }) => {
+    if (opts?.silent) setRefreshing(true);
+    else setLoading(true);
     setError('');
     try {
-      const [t, r] = await Promise.all([listAssessmentTemplates(), listRecentAssessments(25)]);
+      const [t, r] = await Promise.all([
+        listAssessmentTemplates(),
+        listRecentAssessments({
+          limit: 100,
+          from: filterFrom || undefined,
+          to: filterTo || undefined,
+          type: filterType || undefined,
+          q: filterQ.trim() || undefined,
+        }),
+      ]);
       setTemplates(t);
       setRecent(r);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const hasFilters = Boolean(filterFrom || filterTo || filterType || filterQ);
+  const clearFilters = () => {
+    setFilterFrom('');
+    setFilterTo('');
+    setFilterType('');
+    setFilterQ('');
+    setLoading(true);
+    setError('');
+    Promise.all([listAssessmentTemplates(), listRecentAssessments({ limit: 100 })])
+      .then(([t, r]) => {
+        setTemplates(t);
+        setRecent(r);
+      })
+      .catch((err) => setError(errorMessage(err)))
+      .finally(() => setLoading(false));
+  };
 
   if (loading) return <Spinner />;
   if (error) return <ErrorMessage error={error} onRetry={load} />;
@@ -75,10 +110,47 @@ export default function AdminAssessmentsPage() {
 
       <section>
         <h2 className="mb-3 text-lg font-bold text-slate-900">Recent assessments</h2>
+        <Card className="mb-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="From">
+              <input type="date" className={inputCls} value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+            </Field>
+            <Field label="To">
+              <input type="date" className={inputCls} value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+            </Field>
+            <Field label="Child name">
+              <input
+                className={`${inputCls} max-w-[10rem]`}
+                placeholder="Search child…"
+                value={filterQ}
+                onChange={(e) => setFilterQ(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && load({ silent: true })}
+              />
+            </Field>
+            <Field label="Assessment type">
+              <select className={inputCls} value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                <option value="">All types</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </Field>
+            <button type="button" className={btnPrimary} disabled={refreshing} onClick={() => load({ silent: true })}>
+              {refreshing ? 'Filtering…' : 'Apply'}
+            </button>
+            {hasFilters && (
+              <button type="button" className={btnSecondary} onClick={clearFilters}>
+                Clear
+              </button>
+            )}
+          </div>
+        </Card>
         {recent.length === 0 ? (
-          <Card>
-            <p className="text-center text-sm text-slate-500">No assessments completed yet.</p>
-          </Card>
+          <EmptyState>
+            <p className="font-semibold text-slate-700">
+              {hasFilters ? 'No assessments match these filters.' : 'No assessments completed yet.'}
+            </p>
+          </EmptyState>
         ) : (
           <div className="space-y-2">
             {recent.map((a) => (

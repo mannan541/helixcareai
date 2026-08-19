@@ -68,6 +68,27 @@ router.patch(
   resourcesController.update
 );
 
+router.patch(
+  '/:id/upload',
+  requireRoles('admin', 'therapist'),
+  (req, res, next) => {
+    resourceFileUpload.single('file')(req, res, (err: unknown) => {
+      if (err) {
+        const multerErr = err as { code?: string };
+        if (multerErr.code === 'LIMIT_FILE_SIZE') {
+          res.status(413).json({ error: 'File is too large. Maximum upload size is 4 MB.' });
+          return;
+        }
+        res.status(400).json({ error: (err as Error).message || 'Upload failed' });
+        return;
+      }
+      next();
+    });
+  },
+  validate([param('id').isUUID()]),
+  resourcesController.updateWithFile
+);
+
 router.delete(
   '/:id',
   requireRoles('admin'),

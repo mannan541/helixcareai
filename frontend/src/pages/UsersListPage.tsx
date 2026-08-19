@@ -145,6 +145,13 @@ export default function UsersListPage() {
                       {isPending && <span className="ml-1 font-semibold text-amber-600">• pending approval</span>}
                       {isDisabled && <span className="ml-1 font-semibold text-red-600">• disabled</span>}
                     </p>
+                    {u.role === 'parent' && (
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {u.childNames && u.childNames.length > 0
+                          ? `Children: ${u.childNames.join(', ')}`
+                          : 'No children assigned'}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">

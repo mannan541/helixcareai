@@ -196,6 +196,7 @@ export async function listUsers(req: Request, res: Response): Promise<void> {
       deletedAt: toIsoOrString(u.deleted_at),
       mobileNumber: u.mobile_number ?? undefined,
       showMobileToParents: u.role === 'therapist' ? u.show_mobile_to_parents : undefined,
+      childNames: u.role === 'parent' ? (u.child_names ?? []) : undefined,
     })),
     total,
     limit,

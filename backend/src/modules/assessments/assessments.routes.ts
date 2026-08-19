@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { authMiddleware } from '../../middleware/auth';
 import { requireRoles } from '../../middleware/roles';
 import { validate } from '../../middleware/validate';
@@ -14,6 +14,13 @@ router.get('/templates/:typeId', assessmentsController.getTemplateByType);
 router.get(
   '/recent',
   requireRoles('admin', 'therapist'),
+  validate([
+    query('from').optional().isISO8601(),
+    query('to').optional().isISO8601(),
+    query('type').optional().isString(),
+    query('q').optional().isString(),
+    query('limit').optional().isInt({ min: 1, max: 200 }),
+  ]),
   assessmentsController.listRecent
 );
 

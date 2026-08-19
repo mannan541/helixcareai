@@ -7,7 +7,17 @@ import { errorMessage } from '../api/client';
 import { Card, Field, inputCls, btnPrimary, btnSecondary, PageTitle, Spinner, ErrorMessage } from '../components/ui';
 import BackButton from '../components/BackButton';
 
-const THERAPIST_TITLES = ['Speech Therapist', 'Behaviour Therapist', 'Occupational Therapist'];
+const THERAPIST_TITLES = [
+  'Speech Therapist',
+  'Occupational Therapist',
+  'Behaviour Therapist',
+  'ABA Therapist',
+  'Physical Therapist',
+  'Special Education Teacher',
+  'Clinical Psychologist',
+  'Developmental Pediatrician',
+  'Counselor',
+];
 
 export default function UserFormPage() {
   const { userId } = useParams<{ userId?: string }>();
@@ -28,6 +38,7 @@ export default function UserFormPage() {
   const [showMobileToParents, setShowMobileToParents] = useState(false);
   const [childIds, setChildIds] = useState<string[]>([]);
   const [editRole, setEditRole] = useState<string>('');
+  const [customTitle, setCustomTitle] = useState(false);
 
   useEffect(() => {
     listChildren().then(({ children: rows }) => setChildren(rows)).catch(() => {});
@@ -38,6 +49,7 @@ export default function UserFormPage() {
         setFullName(u.fullName);
         setEditRole(u.role);
         setTitle(u.title ?? '');
+        setCustomTitle(Boolean(u.title) && !THERAPIST_TITLES.includes(u.title ?? ''));
         setMobileNumber(u.mobileNumber ?? '');
         setShowMobileToParents(u.showMobileToParents ?? false);
         setChildIds(u.childIds ?? []);
@@ -119,12 +131,35 @@ export default function UserFormPage() {
           )}
           <Field label="Title">
             {activeRole === 'therapist' ? (
-              <select className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)}>
-                <option value="">—</option>
-                {THERAPIST_TITLES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <select
+                  className={inputCls}
+                  value={customTitle ? 'other' : title}
+                  onChange={(e) => {
+                    if (e.target.value === 'other') {
+                      setCustomTitle(true);
+                      setTitle('');
+                    } else {
+                      setCustomTitle(false);
+                      setTitle(e.target.value);
+                    }
+                  }}
+                >
+                  <option value="">—</option>
+                  {THERAPIST_TITLES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                  <option value="other">Other…</option>
+                </select>
+                {customTitle && (
+                  <input
+                    className={inputCls}
+                    placeholder="Enter custom title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                )}
+              </div>
             ) : (
               <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} />
             )}

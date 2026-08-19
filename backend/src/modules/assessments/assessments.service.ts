@@ -64,28 +64,51 @@ export async function listByChild(
 export async function listRecent(
   userId: string,
   role: string,
-  limit = 20
+  filters: { limit?: number; from?: string; to?: string; type?: string; q?: string } = {}
 ): Promise<AssessmentWithMeta[]> {
   if (role !== 'admin' && role !== 'therapist') return [];
 
-  let sql = `
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (role === 'therapist') {
+    params.push(userId);
+    conditions.push(`(c.assigned_therapist_id = $${params.length} OR EXISTS (
+      SELECT 1 FROM child_therapists ct WHERE ct.child_id = c.id AND ct.therapist_id = $${params.length}
+    ))`);
+  }
+  if (filters.from) {
+    params.push(filters.from);
+    conditions.push(`a.assessed_at >= $${params.length}`);
+  }
+  if (filters.to) {
+    params.push(filters.to);
+    conditions.push(`a.assessed_at <= $${params.length}`);
+  }
+  if (filters.type) {
+    params.push(filters.type);
+    conditions.push(`a.assessment_type = $${params.length}`);
+  }
+  if (filters.q?.trim()) {
+    params.push(`%${filters.q.trim()}%`);
+    conditions.push(
+      `(c.first_name ILIKE $${params.length} OR c.last_name ILIKE $${params.length} OR (c.first_name || ' ' || c.last_name) ILIKE $${params.length})`
+    );
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = Math.min(Math.max(filters.limit ?? 20, 1), 200);
+  params.push(limit);
+
+  const sql = `
     SELECT a.*, c.first_name AS child_first_name, c.last_name AS child_last_name,
            c.child_code, c.date_of_birth AS child_dob, u.full_name AS assessor_name
     FROM child_assessments a
     JOIN children c ON a.child_id = c.id
     LEFT JOIN users u ON a.assessor_id = u.id
+    ${where}
+    ORDER BY a.assessed_at DESC, a.created_at DESC LIMIT $${params.length}
   `;
-  const params: unknown[] = [];
-
-  if (role === 'therapist') {
-    params.push(userId);
-    sql += ` WHERE c.assigned_therapist_id = $${params.length} OR EXISTS (
-      SELECT 1 FROM child_therapists ct WHERE ct.child_id = c.id AND ct.therapist_id = $${params.length}
-    )`;
-  }
-
-  params.push(limit);
-  sql += ` ORDER BY a.assessed_at DESC, a.created_at DESC LIMIT $${params.length}`;
 
   return query<AssessmentWithMeta>(sql, params);
 }
