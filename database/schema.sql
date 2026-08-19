@@ -784,3 +784,28 @@ BEGIN
   ALTER TABLE session_comments ADD COLUMN rating SMALLINT CHECK (rating IS NULL OR rating BETWEEN 1 AND 5);
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
+
+-- ============== CUSTOM ASSESSMENT TEMPLATES (admin/therapist-authored, alongside the 4 standard ones) ==============
+CREATE TABLE IF NOT EXISTS custom_assessment_templates (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name         VARCHAR(255) NOT NULL,
+  description  TEXT,
+  questions    JSONB NOT NULL DEFAULT '[]', -- [{ id, text, type: 'single_choice'|'multiple_choice'|'scale'|'text', options?, scaleMax? }]
+  created_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  is_active    BOOLEAN NOT NULL DEFAULT true,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_custom_assessment_templates_active ON custom_assessment_templates(is_active);
+
+DROP TRIGGER IF EXISTS custom_assessment_templates_updated_at ON custom_assessment_templates;
+CREATE TRIGGER custom_assessment_templates_updated_at BEFORE UPDATE ON custom_assessment_templates
+  FOR EACH ROW EXECUTE PROCEDURE set_updated_at();
+
+-- Links a completed assessment back to the custom template it used (NULL for the 4 built-in types).
+DO $$
+BEGIN
+  ALTER TABLE child_assessments ADD COLUMN custom_template_id UUID REFERENCES custom_assessment_templates(id) ON DELETE RESTRICT;
+EXCEPTION WHEN duplicate_column THEN NULL;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_child_assessments_custom_template ON child_assessments(custom_template_id);

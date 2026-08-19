@@ -26,6 +26,8 @@ import AdminSlotsPage from './pages/AdminSlotsPage';
 import AdminAssessmentsPage from './pages/AdminAssessmentsPage';
 import AssessmentConductPage from './pages/AssessmentConductPage';
 import AssessmentReportPage from './pages/AssessmentReportPage';
+import CustomAssessmentBuilderPage from './pages/CustomAssessmentBuilderPage';
+import CustomAssessmentConductPage from './pages/CustomAssessmentConductPage';
 import ResourceLibraryPage from './pages/ResourceLibraryPage';
 import ChildResourcesPage from './pages/ChildResourcesPage';
 import AdminBillingPage from './pages/AdminBillingPage';
@@ -87,6 +89,9 @@ export default function App() {
             <Route path="/admin/assessments" element={<AdminAssessmentsPage />} />
             <Route path="/admin/assessments/conduct/:typeId" element={<AssessmentConductPage />} />
             <Route path="/admin/assessments/:assessmentId/report" element={<AssessmentReportPage />} />
+            <Route path="/admin/assessments/custom/new" element={<CustomAssessmentBuilderPage />} />
+            <Route path="/admin/assessments/custom/:templateId/edit" element={<CustomAssessmentBuilderPage />} />
+            <Route path="/admin/assessments/custom/:templateId/conduct" element={<CustomAssessmentConductPage />} />
             <Route path="/admin/appointments" element={<AdminAppointmentsPage />} />
             <Route path="/admin/slots" element={<AdminSlotsPage />} />
             <Route path="/users" element={<UsersListPage />} />

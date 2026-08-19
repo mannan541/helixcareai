@@ -1,8 +1,29 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { listAssessmentTemplates, listRecentAssessments, type AssessmentTemplateSummary, type ChildAssessment } from '../api/assessments';
+import {
+  listAssessmentTemplates,
+  listRecentAssessments,
+  listCustomTemplates,
+  deleteCustomTemplate,
+  type AssessmentTemplateSummary,
+  type ChildAssessment,
+  type CustomAssessmentTemplate,
+} from '../api/assessments';
 import { errorMessage } from '../api/client';
-import { Card, Field, Spinner, ErrorMessage, EmptyState, PageTitle, btnPrimary, btnSecondary, inputCls } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
+import {
+  Card,
+  Field,
+  Spinner,
+  ErrorMessage,
+  EmptyState,
+  PageTitle,
+  btnPrimary,
+  btnSecondary,
+  btnDanger,
+  inputCls,
+  ConfirmDialog,
+} from '../components/ui';
 import { formatDate } from '../utils/format';
 
 const TYPE_ICONS: Record<string, string> = {
@@ -14,11 +35,15 @@ const TYPE_ICONS: Record<string, string> = {
 
 export default function AdminAssessmentsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [templates, setTemplates] = useState<AssessmentTemplateSummary[]>([]);
+  const [customTemplates, setCustomTemplates] = useState<CustomAssessmentTemplate[]>([]);
   const [recent, setRecent] = useState<ChildAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<CustomAssessmentTemplate | null>(null);
 
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
@@ -29,18 +54,22 @@ export default function AdminAssessmentsPage() {
     if (opts?.silent) setRefreshing(true);
     else setLoading(true);
     setError('');
+    const isCustomFilter = filterType.startsWith('custom:');
     try {
-      const [t, r] = await Promise.all([
+      const [t, ct, r] = await Promise.all([
         listAssessmentTemplates(),
+        listCustomTemplates(!isAdmin),
         listRecentAssessments({
           limit: 100,
           from: filterFrom || undefined,
           to: filterTo || undefined,
-          type: filterType || undefined,
+          type: filterType && !isCustomFilter ? filterType : undefined,
+          customTemplateId: isCustomFilter ? filterType.slice('custom:'.length) : undefined,
           q: filterQ.trim() || undefined,
         }),
       ]);
       setTemplates(t);
+      setCustomTemplates(ct);
       setRecent(r);
     } catch (err) {
       setError(errorMessage(err));
@@ -63,9 +92,10 @@ export default function AdminAssessmentsPage() {
     setFilterQ('');
     setLoading(true);
     setError('');
-    Promise.all([listAssessmentTemplates(), listRecentAssessments({ limit: 100 })])
-      .then(([t, r]) => {
+    Promise.all([listAssessmentTemplates(), listCustomTemplates(!isAdmin), listRecentAssessments({ limit: 100 })])
+      .then(([t, ct, r]) => {
         setTemplates(t);
+        setCustomTemplates(ct);
         setRecent(r);
       })
       .catch((err) => setError(errorMessage(err)))
@@ -109,6 +139,63 @@ export default function AdminAssessmentsPage() {
       </section>
 
       <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">Custom assessments</h2>
+          <button type="button" className={btnSecondary} onClick={() => navigate('/admin/assessments/custom/new')}>
+            + Create custom assessment
+          </button>
+        </div>
+        {customTemplates.length === 0 ? (
+          <EmptyState>
+            <p className="text-sm text-slate-500">
+              No custom assessments yet. Build your own with custom questions, multiple choice, scales, or free text.
+            </p>
+          </EmptyState>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {customTemplates.map((t) => (
+              <Card key={t.id} className="flex h-full flex-col">
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl">📝</span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-slate-900">
+                      {t.name}
+                      {!t.isActive && <span className="ml-2 text-xs font-normal text-slate-400">(inactive)</span>}
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">{t.questions.length} questions</p>
+                    {t.description && <p className="mt-2 text-sm text-slate-600">{t.description}</p>}
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={`${btnPrimary} flex-1`}
+                    onClick={() => navigate(`/admin/assessments/custom/${t.id}/conduct`)}
+                  >
+                    Start assessment
+                  </button>
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        className={btnSecondary}
+                        onClick={() => navigate(`/admin/assessments/custom/${t.id}/edit`)}
+                      >
+                        Edit
+                      </button>
+                      <button type="button" className={btnDanger} onClick={() => setDeleteTarget(t)}>
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
         <h2 className="mb-3 text-lg font-bold text-slate-900">Recent assessments</h2>
         <Card className="mb-3">
           <div className="flex flex-wrap items-end gap-2">
@@ -132,6 +219,9 @@ export default function AdminAssessmentsPage() {
                 <option value="">All types</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+                {customTemplates.map((t) => (
+                  <option key={t.id} value={`custom:${t.id}`}>{t.name} (custom)</option>
                 ))}
               </select>
             </Field>
@@ -182,6 +272,26 @@ export default function AdminAssessmentsPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete custom assessment"
+        message={`Delete "${deleteTarget?.name}"? This cannot be undone. If it has already been used for a saved assessment, deletion will be blocked — deactivate it instead.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await deleteCustomTemplate(deleteTarget.id);
+            setDeleteTarget(null);
+            await load({ silent: true });
+          } catch (err) {
+            setError(errorMessage(err));
+            setDeleteTarget(null);
+          }
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

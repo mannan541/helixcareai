@@ -3,11 +3,13 @@ import * as childrenService from '../children/children.service';
 import { ASSESSMENT_TEMPLATES, getTemplate, isValidAssessmentType } from './assessmentTemplates';
 import { scoreAssessment } from './scoring';
 import type { AssessmentTypeId } from './assessmentTemplates';
+import * as customTemplatesService from './customTemplates.service';
 
 export type AssessmentRow = {
   id: string;
   child_id: string;
   assessment_type: string;
+  custom_template_id: string | null;
   assessed_at: string;
   assessor_id: string | null;
   respondent: string | null;
@@ -25,6 +27,7 @@ export type AssessmentWithMeta = AssessmentRow & {
   child_code: string | null;
   child_dob: string | null;
   assessor_name: string | null;
+  custom_template_name: string | null;
 };
 
 export function listTemplates() {
@@ -50,13 +53,16 @@ export async function listByChild(
   childId: string,
   userId: string,
   role: string
-): Promise<AssessmentRow[] | null> {
+): Promise<(AssessmentRow & { custom_template_name: string | null })[] | null> {
   const child = await childrenService.findById(childId);
   if (!child) return null;
   if (!childrenService.canAccessChild(child.user_id, userId, role)) return null;
 
-  return query<AssessmentRow>(
-    `SELECT * FROM child_assessments WHERE child_id = $1 ORDER BY assessed_at DESC, created_at DESC`,
+  return query<AssessmentRow & { custom_template_name: string | null }>(
+    `SELECT a.*, cat.name AS custom_template_name
+     FROM child_assessments a
+     LEFT JOIN custom_assessment_templates cat ON cat.id = a.custom_template_id
+     WHERE a.child_id = $1 ORDER BY a.assessed_at DESC, a.created_at DESC`,
     [childId]
   );
 }
@@ -64,7 +70,7 @@ export async function listByChild(
 export async function listRecent(
   userId: string,
   role: string,
-  filters: { limit?: number; from?: string; to?: string; type?: string; q?: string } = {}
+  filters: { limit?: number; from?: string; to?: string; type?: string; customTemplateId?: string; q?: string } = {}
 ): Promise<AssessmentWithMeta[]> {
   if (role !== 'admin' && role !== 'therapist') return [];
 
@@ -89,6 +95,10 @@ export async function listRecent(
     params.push(filters.type);
     conditions.push(`a.assessment_type = $${params.length}`);
   }
+  if (filters.customTemplateId) {
+    params.push(filters.customTemplateId);
+    conditions.push(`a.custom_template_id = $${params.length}`);
+  }
   if (filters.q?.trim()) {
     params.push(`%${filters.q.trim()}%`);
     conditions.push(
@@ -102,10 +112,12 @@ export async function listRecent(
 
   const sql = `
     SELECT a.*, c.first_name AS child_first_name, c.last_name AS child_last_name,
-           c.child_code, c.date_of_birth AS child_dob, u.full_name AS assessor_name
+           c.child_code, c.date_of_birth AS child_dob, u.full_name AS assessor_name,
+           cat.name AS custom_template_name
     FROM child_assessments a
     JOIN children c ON a.child_id = c.id
     LEFT JOIN users u ON a.assessor_id = u.id
+    LEFT JOIN custom_assessment_templates cat ON cat.id = a.custom_template_id
     ${where}
     ORDER BY a.assessed_at DESC, a.created_at DESC LIMIT $${params.length}
   `;
@@ -116,10 +128,12 @@ export async function listRecent(
 export async function findById(id: string): Promise<AssessmentWithMeta | null> {
   const rows = await query<AssessmentWithMeta>(
     `SELECT a.*, c.first_name AS child_first_name, c.last_name AS child_last_name,
-            c.child_code, c.date_of_birth AS child_dob, u.full_name AS assessor_name
+            c.child_code, c.date_of_birth AS child_dob, u.full_name AS assessor_name,
+            cat.name AS custom_template_name
      FROM child_assessments a
      JOIN children c ON a.child_id = c.id
      LEFT JOIN users u ON a.assessor_id = u.id
+     LEFT JOIN custom_assessment_templates cat ON cat.id = a.custom_template_id
      WHERE a.id = $1`,
     [id]
   );
@@ -143,6 +157,7 @@ export async function create(
   data: {
     childId: string;
     assessmentType: string;
+    customTemplateId?: string;
     assessedAt: string;
     respondent?: string;
     responses: Record<string, unknown>;
@@ -150,28 +165,48 @@ export async function create(
   }
 ): Promise<AssessmentRow | null> {
   if (role !== 'admin' && role !== 'therapist') return null;
-  if (!isValidAssessmentType(data.assessmentType)) return null;
+
+  let customTemplateId: string | null = null;
+  let interpretation: string;
+  let scores: Record<string, unknown>;
+
+  if (data.assessmentType === 'custom') {
+    if (!data.customTemplateId) return null;
+    const template = await customTemplatesService.getCustomTemplate(data.customTemplateId);
+    if (!template || !template.is_active) return null;
+    customTemplateId = template.id;
+    const answered = template.questions.filter((q) => {
+      const v = data.responses[q.id];
+      return v != null && v !== '' && !(Array.isArray(v) && v.length === 0);
+    }).length;
+    interpretation = `${answered} of ${template.questions.length} questions answered.`;
+    scores = {};
+  } else {
+    if (!isValidAssessmentType(data.assessmentType)) return null;
+    const scored = scoreAssessment(data.assessmentType as AssessmentTypeId, data.responses);
+    interpretation = scored.interpretation;
+    scores = scored;
+  }
 
   const child = await childrenService.findById(data.childId);
   if (!child) return null;
   if (!childrenService.canAccessChild(child.user_id, userId, role)) return null;
 
-  const scored = scoreAssessment(data.assessmentType as AssessmentTypeId, data.responses);
-
   const rows = await query<AssessmentRow>(
     `INSERT INTO child_assessments
-       (child_id, assessment_type, assessed_at, assessor_id, respondent, responses, scores, interpretation, notes)
-     VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9)
+       (child_id, assessment_type, custom_template_id, assessed_at, assessor_id, respondent, responses, scores, interpretation, notes)
+     VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10)
      RETURNING *`,
     [
       data.childId,
       data.assessmentType,
+      customTemplateId,
       data.assessedAt,
       userId,
       data.respondent ?? null,
       JSON.stringify(data.responses),
-      JSON.stringify(scored),
-      scored.interpretation,
+      JSON.stringify(scores),
+      interpretation,
       data.notes ?? null,
     ]
   );

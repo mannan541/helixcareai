@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getAssessment, type AssessmentTemplate, type ChildAssessment } from '../api/assessments';
+import { getAssessment, type AssessmentTemplate, type ChildAssessment, type CustomAssessmentTemplate } from '../api/assessments';
 import { errorMessage } from '../api/client';
 import { Spinner, ErrorMessage, btnPrimary, btnSecondary } from '../components/ui';
 import BackButton from '../components/BackButton';
@@ -34,19 +34,29 @@ function riskBadge(scores: Record<string, unknown>) {
   );
 }
 
+function formatCustomAnswer(question: CustomAssessmentTemplate['questions'][number], raw: unknown): string {
+  if (question.type === 'multiple_choice') {
+    return Array.isArray(raw) && raw.length > 0 ? raw.join(', ') : '—';
+  }
+  if (raw == null || raw === '') return '—';
+  return String(raw);
+}
+
 export default function AssessmentReportPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
   const [assessment, setAssessment] = useState<ChildAssessment | null>(null);
   const [template, setTemplate] = useState<AssessmentTemplate | null>(null);
+  const [customTemplate, setCustomTemplate] = useState<CustomAssessmentTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!assessmentId) return;
     getAssessment(assessmentId)
-      .then(({ assessment: a, template: t }) => {
+      .then(({ assessment: a, template: t, customTemplate: ct }) => {
         setAssessment(a);
         setTemplate(t);
+        setCustomTemplate(ct);
       })
       .catch((err) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
@@ -54,10 +64,101 @@ export default function AssessmentReportPage() {
 
   if (loading) return <Spinner />;
   if (error) return <ErrorMessage error={error} />;
-  if (!assessment || !template) return null;
+  if (!assessment) return null;
+  if (!template && !customTemplate) return null;
 
-  const scores = assessment.scores ?? {};
   const childName = [assessment.childFirstName, assessment.childLastName].filter(Boolean).join(' ');
+
+  if (customTemplate) {
+    return (
+      <div>
+        <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
+          <BackButton fallback="/admin/assessments" />
+          <div className="flex gap-2">
+            <button type="button" className={btnPrimary} onClick={() => window.print()}>
+              Print report
+            </button>
+            <button type="button" className={btnSecondary} onClick={() => window.history.back()}>
+              Back
+            </button>
+          </div>
+        </div>
+
+        <article className="print-report mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white p-8 shadow-sm print:border-0 print:shadow-none">
+          <header className="border-b border-slate-200 pb-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-primary">HelixCareAI</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900">{customTemplate.name}</h1>
+            <p className="text-sm text-slate-500">Custom Assessment Report</p>
+          </header>
+
+          <section className="mt-6 grid gap-4 border-b border-slate-200 pb-6 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Child</p>
+              <p className="font-semibold text-slate-900">{childName || '—'}</p>
+              {assessment.childCode && <p className="text-sm text-slate-600">ID: {assessment.childCode}</p>}
+              {assessment.childDob && <p className="text-sm text-slate-600">DOB: {formatDate(assessment.childDob)}</p>}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Assessment details</p>
+              <p className="text-sm text-slate-800">Date: {formatDate(assessment.assessedAt)}</p>
+              {assessment.respondent && <p className="text-sm text-slate-800">Respondent: {assessment.respondent}</p>}
+              {assessment.assessorName && <p className="text-sm text-slate-800">Completed by: {assessment.assessorName}</p>}
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <h2 className="text-lg font-bold text-slate-900">Responses</h2>
+            <table className="mt-3 w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
+                  <th className="py-2 pr-2">#</th>
+                  <th className="py-2 pr-2">Question</th>
+                  <th className="py-2">Response</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customTemplate.questions.map((q, i) => (
+                  <tr key={q.id} className="border-b border-slate-100">
+                    <td className="py-2 pr-2 align-top text-slate-500">{i + 1}</td>
+                    <td className="py-2 pr-2 align-top text-slate-800">{q.text}</td>
+                    <td className="py-2 align-top font-medium text-slate-900">
+                      {formatCustomAnswer(q, assessment.responses[q.id])}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          {assessment.notes && (
+            <section className="mt-6 border-t border-slate-200 pt-6">
+              <h2 className="text-lg font-bold text-slate-900">Notes</h2>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{assessment.notes}</p>
+            </section>
+          )}
+
+          <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-400">
+            <p>Custom assessment — not a standardized clinical screening instrument.</p>
+            <p className="mt-1">Generated {formatDate(assessment.createdAt)}.</p>
+          </footer>
+        </article>
+
+        <style>{`
+          @media print {
+            body * { visibility: hidden; }
+            .print-report, .print-report * { visibility: visible; }
+            .print-report { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; padding: 0; }
+            .no-print { display: none !important; }
+            aside, header { display: none !important; }
+            main { padding: 0 !important; }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (!template) return null;
+  const scores = assessment.scores ?? {};
 
   return (
     <div>

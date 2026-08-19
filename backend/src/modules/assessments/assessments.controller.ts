@@ -1,14 +1,21 @@
 import { Request, Response } from 'express';
 import * as assessmentsService from './assessments.service';
+import * as customTemplatesService from './customTemplates.service';
 import { getTemplate as getAssessmentTemplate } from './assessmentTemplates';
 
-function toDto(row: assessmentsService.AssessmentRow | assessmentsService.AssessmentWithMeta) {
+function toDto(
+  row: assessmentsService.AssessmentRow | assessmentsService.AssessmentWithMeta | (assessmentsService.AssessmentRow & { custom_template_name: string | null })
+) {
   const template = getAssessmentTemplate(row.assessment_type);
+  const customName = 'custom_template_name' in row ? row.custom_template_name : undefined;
+  const assessmentName =
+    row.assessment_type === 'custom' ? (customName ?? 'Custom Assessment') : (template?.name ?? row.assessment_type);
   return {
     id: row.id,
     childId: row.child_id,
     assessmentType: row.assessment_type,
-    assessmentName: template?.name ?? row.assessment_type,
+    customTemplateId: row.custom_template_id,
+    assessmentName,
     assessedAt: row.assessed_at,
     assessorId: row.assessor_id,
     respondent: row.respondent,
@@ -46,6 +53,7 @@ export async function listRecent(req: Request, res: Response): Promise<void> {
     from: req.query.from as string | undefined,
     to: req.query.to as string | undefined,
     type: req.query.type as string | undefined,
+    customTemplateId: req.query.customTemplateId as string | undefined,
     q: req.query.q as string | undefined,
   });
   res.json({ assessments: rows.map(toDto) });
@@ -72,14 +80,30 @@ export async function getOne(req: Request, res: Response): Promise<void> {
     return;
   }
   const template = getAssessmentTemplate(row.assessment_type);
-  res.json({ assessment: toDto(row), template: template ?? null });
+  let customTemplate = null;
+  if (row.assessment_type === 'custom' && row.custom_template_id) {
+    customTemplate = await customTemplatesService.getCustomTemplate(row.custom_template_id);
+  }
+  res.json({
+    assessment: toDto(row),
+    template: template ?? null,
+    customTemplate: customTemplate
+      ? {
+          id: customTemplate.id,
+          name: customTemplate.name,
+          description: customTemplate.description,
+          questions: customTemplate.questions,
+        }
+      : null,
+  });
 }
 
 export async function create(req: Request, res: Response): Promise<void> {
-  const { childId, assessmentType, assessedAt, respondent, responses, notes } = req.body;
+  const { childId, assessmentType, customTemplateId, assessedAt, respondent, responses, notes } = req.body;
   const row = await assessmentsService.create(req.user!.userId, req.user!.role, {
     childId,
     assessmentType,
+    customTemplateId,
     assessedAt,
     respondent,
     responses,
