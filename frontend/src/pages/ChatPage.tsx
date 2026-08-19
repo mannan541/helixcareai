@@ -6,6 +6,7 @@ import type { ChatMessage, Child } from '../api/types';
 import { errorMessage } from '../api/client';
 import { Spinner, ErrorMessage, inputCls, btnPrimary } from '../components/ui';
 import BackButton from '../components/BackButton';
+import { formatDateTime } from '../utils/format';
 
 export default function ChatPage() {
   const { childId: routeChildId } = useParams<{ childId?: string }>();
@@ -109,7 +110,7 @@ export default function ChatPage() {
         ) : (
           <div className="space-y-3">
             {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
                   className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm sm:max-w-[70%] ${
                     m.role === 'user'
@@ -119,6 +120,7 @@ export default function ChatPage() {
                 >
                   {m.content}
                 </div>
+                <span className="mt-1 px-1 text-[11px] text-slate-400">{formatDateTime(m.createdAt)}</span>
               </div>
             ))}
             {sending && (
