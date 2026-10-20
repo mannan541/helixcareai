@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter } from 'react-router-dom'
 import { AuthLayout } from '@/app/layouts/auth-layout'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { AuthGuard } from '@/app/guards/auth-guard'
@@ -13,31 +13,38 @@ export const router = createBrowserRouter([
     element: <LandingPage />,
   },
   {
+    path: '/login',
     element: <AuthLayout />,
     children: [
       {
-        path: '/login',
+        index: true,
         element: <LoginPage />,
       },
+    ],
+  },
+  {
+    path: '/register',
+    element: <AuthLayout />,
+    children: [
       {
-        path: '/register',
+        index: true,
         element: <RegisterPage />,
       },
     ],
   },
   {
+    path: '/app',
     element: <AuthGuard />,
     children: [
       {
-        path: '/app',
         element: <AppLayout />,
         children: [
           {
-            index: true,
-            element: <Navigate to="/app/dashboard" replace />,
+            path: 'dashboard',
+            element: <DashboardPage />,
           },
           {
-            path: 'dashboard',
+            path: '',
             element: <DashboardPage />,
           },
         ],
