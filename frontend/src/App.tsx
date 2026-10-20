@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import { Spinner } from './components/ui';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -47,7 +48,7 @@ function Protected({ children }: { children: React.ReactNode }) {
 function PublicOnly({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner className="mt-20" />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -56,10 +57,12 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
           <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
           <Route element={<Protected><Layout /></Protected>}>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/profile" element={<EditProfilePage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/children" element={<ChildrenListPage />} />
@@ -79,25 +82,33 @@ export default function App() {
             <Route path="/resources" element={<ResourceLibraryPage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/appointments/book" element={<BookAppointmentPage />} />
-            <Route path="/schedule" element={<TherapistSchedulePage />} />
-            <Route path="/parent/schedule" element={<ParentSchedulePage />} />
-            <Route path="/billing" element={<ParentBillingPage />} />
-            <Route path="/billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
-            <Route path="/admin/billing" element={<AdminBillingPage />} />
-            <Route path="/admin/therapist-analytics" element={<TherapistAnalyticsPage />} />
-            <Route path="/admin/billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
-            <Route path="/admin/assessments" element={<AdminAssessmentsPage />} />
-            <Route path="/admin/assessments/conduct/:typeId" element={<AssessmentConductPage />} />
-            <Route path="/admin/assessments/:assessmentId/report" element={<AssessmentReportPage />} />
-            <Route path="/admin/assessments/custom/new" element={<CustomAssessmentBuilderPage />} />
-            <Route path="/admin/assessments/custom/:templateId/edit" element={<CustomAssessmentBuilderPage />} />
-            <Route path="/admin/assessments/custom/:templateId/conduct" element={<CustomAssessmentConductPage />} />
+            <Route path="/schedule/therapist" element={<TherapistSchedulePage />} />
+            <Route path="/schedule/parent" element={<ParentSchedulePage />} />
             <Route path="/admin/appointments" element={<AdminAppointmentsPage />} />
             <Route path="/admin/slots" element={<AdminSlotsPage />} />
-            <Route path="/users" element={<UsersListPage />} />
-            <Route path="/users/new" element={<UserFormPage />} />
-            <Route path="/users/:userId/edit" element={<UserFormPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/admin/users" element={<UsersListPage />} />
+            <Route path="/users" element={<Navigate to="/admin/users" replace />} />
+            <Route path="/admin/users/new" element={<UserFormPage />} />
+            <Route path="/users/new" element={<Navigate to="/admin/users/new" replace />} />
+            <Route path="/admin/users/:userId/edit" element={<UserFormPage />} />
+            <Route path="/users/:userId/edit" element={<Navigate to="/admin/users/:userId/edit" replace />} />
+            <Route path="/assessments/admin" element={<AdminAssessmentsPage />} />
+            <Route path="/assessments/conduct" element={<AssessmentConductPage />} />
+            <Route path="/assessments/conduct/:templateId" element={<AssessmentConductPage />} />
+            <Route path="/admin/assessments/conduct/:templateId" element={<AssessmentConductPage />} />
+            <Route path="/assessments/conduct/custom" element={<CustomAssessmentConductPage />} />
+            <Route path="/assessments/report/:assessmentId" element={<AssessmentReportPage />} />
+            <Route path="/admin/assessments/:assessmentId/report" element={<AssessmentReportPage />} />
+            <Route path="/assessments/custom/new" element={<CustomAssessmentBuilderPage />} />
+            <Route path="/admin/assessments/custom/new" element={<CustomAssessmentBuilderPage />} />
+            <Route path="/assessments/custom/:id/edit" element={<CustomAssessmentBuilderPage />} />
+            <Route path="/admin/assessments/custom/:id/edit" element={<CustomAssessmentBuilderPage />} />
+            <Route path="/billing/admin" element={<AdminBillingPage />} />
+            <Route path="/admin/billing" element={<AdminBillingPage />} />
+            <Route path="/analytics/therapist" element={<TherapistAnalyticsPage />} />
+            <Route path="/billing/parent" element={<ParentBillingPage />} />
+            <Route path="/billing/:invoiceId" element={<InvoiceDetailPage />} />
+            <Route path="/admin/billing/invoices/:invoiceId" element={<InvoiceDetailPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

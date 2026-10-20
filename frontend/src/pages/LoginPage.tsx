@@ -19,7 +19,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await login(email.trim(), password);
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -86,10 +86,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-slate-600">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="font-semibold text-primary hover:underline">
-            Create one
-          </Link>
+          Don't have an account? <Link to="/register" className="font-semibold text-primary hover:underline">Create one</Link>
         </p>
       </div>
     </div>

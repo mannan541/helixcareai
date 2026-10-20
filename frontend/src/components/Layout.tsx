@@ -1,30 +1,28 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { unreadCount } from '../api/notifications';
+import { unreadCount as getUnreadCount } from '../api/notifications';
 import { ConfirmDialog } from './ui';
 
-type NavItem = { to: string; label: string; icon: string };
-
-function navItemsFor(role: string): NavItem[] {
-  const items: NavItem[] = [
-    { to: '/', label: 'Dashboard', icon: '📊' },
+function buildNav(role: string) {
+  const items = [
+    { to: '/dashboard', label: 'Dashboard', icon: '📊' },
     { to: '/children', label: 'Children', icon: '🧒' },
   ];
   if (role === 'admin') {
-    items.push({ to: '/users', label: 'Users', icon: '👥' });
-    items.push({ to: '/admin/assessments', label: 'Assessments', icon: '📊' });
-    items.push({ to: '/admin/billing', label: 'Billing', icon: '💳' });
-    items.push({ to: '/admin/therapist-analytics', label: 'Therapist Analytics', icon: '📈' });
+    items.push({ to: '/admin/users', label: 'Users', icon: '👥' });
+    items.push({ to: '/assessments/admin', label: 'Assessments', icon: '📊' });
+    items.push({ to: '/billing/admin', label: 'Billing', icon: '💳' });
+    items.push({ to: '/analytics/therapist', label: 'Therapist Analytics', icon: '📈' });
     items.push({ to: '/resources', label: 'Resource Library', icon: '📚' });
     items.push({ to: '/admin/appointments', label: 'Appointments', icon: '📅' });
     items.push({ to: '/admin/slots', label: 'Manage Slots', icon: '🕒' });
   } else if (role === 'therapist') {
     items.push({ to: '/resources', label: 'Resource Library', icon: '📚' });
-    items.push({ to: '/schedule', label: 'My Schedule', icon: '📅' });
+    items.push({ to: '/schedule/therapist', label: 'My Schedule', icon: '📅' });
   } else {
-    items.push({ to: '/parent/schedule', label: 'My Schedule', icon: '📅' });
-    items.push({ to: '/billing', label: 'Billing', icon: '💳' });
+    items.push({ to: '/schedule/parent', label: 'My Schedule', icon: '📅' });
+    items.push({ to: '/billing/parent', label: 'Billing', icon: '💳' });
     items.push({ to: '/appointments/book', label: 'Book Appointment', icon: '➕' });
   }
   items.push({ to: '/chat', label: 'AI Assistant', icon: '💬' });
@@ -39,21 +37,22 @@ export default function Layout() {
   const [confirmLogout, setConfirmLogout] = useState(false);
 
   useEffect(() => {
-    unreadCount().then(setUnread).catch(() => {});
-    const t = setInterval(() => unreadCount().then(setUnread).catch(() => {}), 60_000);
-    return () => clearInterval(t);
+    getUnreadCount()
+      .then(setUnread)
+      .catch(() => {});
+    const id = setInterval(() => getUnreadCount().then(setUnread).catch(() => {}), 60000);
+    return () => clearInterval(id);
   }, []);
 
   if (!user) return null;
-  const items = navItemsFor(user.role);
 
   const nav = (
     <nav className="flex flex-col gap-1 p-3">
-      {items.map((item) => (
+      {buildNav(user.role).map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
-          end={item.to === '/'}
+          end={item.to === '/dashboard'}
           onClick={() => setMenuOpen(false)}
           className={({ isActive }) =>
             `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
@@ -61,7 +60,7 @@ export default function Layout() {
             }`
           }
         >
-          <span aria-hidden>{item.icon}</span>
+          <span aria-hidden="true">{item.icon}</span>
           {item.label}
         </NavLink>
       ))}
@@ -72,10 +71,14 @@ export default function Layout() {
     <div className="flex h-dvh overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden h-full w-60 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white md:flex">
-        <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-4">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-4 text-left hover:bg-slate-50"
+          aria-label="Go to dashboard"
+        >
           <span className="text-2xl">🩺</span>
           <span className="text-lg font-bold text-primary-dark">HelixCareAI</span>
-        </div>
+        </button>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{nav}</div>
       </aside>
 
@@ -84,10 +87,17 @@ export default function Layout() {
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
           <aside className="absolute left-0 top-0 flex h-full w-64 flex-col overflow-hidden bg-white shadow-xl">
-            <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-4">
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                navigate('/dashboard');
+              }}
+              className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-4 text-left hover:bg-slate-50"
+              aria-label="Go to dashboard"
+            >
               <span className="text-2xl">🩺</span>
               <span className="text-lg font-bold text-primary-dark">HelixCareAI</span>
-            </div>
+            </button>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{nav}</div>
           </aside>
         </div>
@@ -109,11 +119,7 @@ export default function Layout() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              className="relative rounded-lg p-2 text-lg hover:bg-slate-100"
-              onClick={() => navigate('/notifications')}
-              title="Notifications"
-            >
+            <button className="relative rounded-lg p-2 text-lg hover:bg-slate-100" onClick={() => navigate('/notifications')} title="Notifications">
               🔔
               {unread > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
@@ -121,18 +127,10 @@ export default function Layout() {
                 </span>
               )}
             </button>
-            <button
-              className="rounded-lg p-2 text-lg hover:bg-slate-100"
-              onClick={() => navigate('/profile')}
-              title="Profile"
-            >
+            <button className="rounded-lg p-2 text-lg hover:bg-slate-100" onClick={() => navigate('/profile')} title="Profile">
               👤
             </button>
-            <button
-              className="rounded-lg p-2 text-lg hover:bg-slate-100"
-              onClick={() => setConfirmLogout(true)}
-              title="Log out"
-            >
+            <button className="rounded-lg p-2 text-lg hover:bg-slate-100" onClick={() => setConfirmLogout(true)} title="Log out">
               🚪
             </button>
           </div>

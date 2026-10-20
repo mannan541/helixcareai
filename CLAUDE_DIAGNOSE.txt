@@ -1,0 +1,208 @@
+=== Router (web/src/app/router/index.tsx) ===
+import { createBrowserRouter } from 'react-router-dom'
+import { AuthLayout } from '@/app/layouts/auth-layout'
+import { AppLayout } from '@/app/layouts/app-layout'
+import { AuthGuard } from '@/app/guards/auth-guard'
+import { LoginPage } from '@/features/auth/pages/login-page'
+import { RegisterPage } from '@/features/auth/pages/register-page'
+import { DashboardPage } from '@/features/dashboard/pages/dashboard-page'
+import { LandingPage } from '@/features/marketing/pages/landing-page'
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <LandingPage />,
+  },
+  {
+    path: '/login',
+    element: <AuthLayout />,
+    children: [
+      {
+        index: true,
+        element: <LoginPage />,
+      },
+    ],
+  },
+  {
+    path: '/register',
+    element: <AuthLayout />,
+    children: [
+      {
+        index: true,
+        element: <RegisterPage />,
+      },
+    ],
+  },
+  {
+    path: '/app',
+    element: <AuthGuard />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [
+          {
+            path: 'dashboard',
+            element: <DashboardPage />,
+          },
+          {
+            path: '',
+            element: <DashboardPage />,
+          },
+        ],
+      },
+    ],
+  },
+])
+
+
+=== App.tsx ===
+import { RouterProvider } from 'react-router-dom'
+import { router } from '@/app/router'
+import { QueryProvider } from '@/app/providers/query-provider'
+
+function App() {
+  return (
+    <QueryProvider>
+      <RouterProvider router={router} />
+    </QueryProvider>
+  )
+}
+
+export default App
+
+
+=== Auth Store (web/src/core/auth/store.ts) ===
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import type { User, UserRole } from '@/core/types'
+
+interface AuthState {
+  user: User | null
+  token: string | null
+  isAuthenticated: boolean
+  setAuth: (user: User, token: string) => void
+  logout: () => void
+  updateUser: (user: Partial<User>) => void
+  hasRole: (roles: UserRole | UserRole[]) => boolean
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
+      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      updateUser: (userData) => {
+        const currentUser = get().user
+        if (currentUser) {
+          set({ user: { ...currentUser, ...userData } })
+        }
+      },
+      hasRole: (roles) => {
+        const { user } = get()
+        if (!user) return false
+        const roleArray = Array.isArray(roles) ? roles : [roles]
+        return roleArray.includes(user.role)
+      },
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({ user: state.user, token: state.token, isAuthenticated: state.isAuthenticated }),
+    }
+  )
+)
+
+
+=== Axios Client (web/src/core/api/client.ts) ===
+import axios from 'axios'
+import { env } from '@/core/config/env'
+import { useAuthStore } from '@/core/auth/store'
+
+const apiClient = axios.create({
+  baseURL: env.API_BASE_URL,
+  timeout: 30000,
+})
+
+apiClient.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const authStore = useAuthStore.getState()
+      authStore.logout()
+      // Optionally redirect - handled by route guards
+    }
+    return Promise.reject(error)
+  }
+)
+
+export default apiClient
+
+
+=== Query Provider ===
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactNode } from 'react'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
+
+export function QueryProvider({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  )
+}
+
+
+=== Auth Guard ===
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useAuthStore } from '@/core/auth/store'
+
+export function AuthGuard() {
+  const { isAuthenticated } = useAuthStore()
+  const location = useLocation()
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  return <Outlet />
+}
+
+
+=== vercel.json ===
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
