@@ -1,12 +1,18 @@
 {
   "version": 2,
-  "buildCommand": "cd web && npm ci && npm run build",
-  "outputDirectory": "web/dist",
-  "installCommand": "echo 'skip'",
-  "rewrites": [
+  "builds": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
