@@ -1,8 +1,8 @@
 {
-  "buildCommand": "cd web && npm install && npm run build",
+  "version": 2,
+  "buildCommand": "cd web && npm ci && npm run build",
   "outputDirectory": "web/dist",
-  "installCommand": "cd web && npm install",
-  "framework": null,
+  "installCommand": "echo 'skip'",
   "rewrites": [
     {
       "source": "/(.*)",
