@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import { Spinner } from './components/ui';
-import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -37,6 +36,15 @@ import ParentBillingPage from './pages/ParentBillingPage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import UsersListPage from './pages/UsersListPage';
 import UserFormPage from './pages/UserFormPage';
+// Marketing
+import MarketingLayout from './components/marketing/MarketingLayout';
+import HomePage from './pages/marketing/HomePage';
+import AboutPage from './pages/marketing/AboutPage';
+import ServicesPage from './pages/marketing/ServicesPage';
+import PlatformPage from './pages/marketing/PlatformPage';
+import ContactPage from './pages/marketing/ContactPage';
+import PrivacyPage from './pages/marketing/PrivacyPage';
+import TermsPage from './pages/marketing/TermsPage';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -62,7 +70,16 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          {/* Marketing site */}
+          <Route element={<MarketingLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route path="/platform" element={<PlatformPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+          </Route>
           <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
           <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
           <Route element={<Protected><Layout /></Protected>}>
