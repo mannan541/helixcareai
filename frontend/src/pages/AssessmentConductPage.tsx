@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { getAssessmentTemplate, startAssessment } from '../api/assessments';
+import { getAssessmentTemplate, createAssessment } from '../api/assessments';
 import { useAuth } from '../context/AuthContext';
-import { Card, PageHeader, Spinner, ErrorMessage } from '../components/ui';
+import { Card, Spinner, ErrorMessage } from '../components/ui';
+import PageHeader from '../components/PageHeader';
 
 const templateMeta: Record<string, { title: string; description: string }> = {
   adhd_rating_scale: {
@@ -39,7 +40,7 @@ export default function AssessmentConductPage() {
     setError('');
     setLoading(true);
     try {
-      const assessment = await startAssessment({ templateId: key, childId: childId || undefined });
+      const assessment = await createAssessment({ assessmentType: key, childId: childId || undefined });
       navigate(`/assessments/report/${assessment.id}`);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to start assessment');
