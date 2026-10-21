@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import { Spinner } from './components/ui';
@@ -52,6 +52,11 @@ function PublicOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RedirectUserEdit() {
+  const { userId } = useParams<{ userId: string }>();
+  return <Navigate to={`/admin/users/${userId}/edit`} replace />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -91,7 +96,7 @@ export default function App() {
             <Route path="/admin/users/new" element={<UserFormPage />} />
             <Route path="/users/new" element={<Navigate to="/admin/users/new" replace />} />
             <Route path="/admin/users/:userId/edit" element={<UserFormPage />} />
-            <Route path="/users/:userId/edit" element={<Navigate to="/admin/users/:userId/edit" replace />} />
+            <Route path="/users/:userId/edit" element={<RedirectUserEdit />} />
             <Route path="/assessments/admin" element={<AdminAssessmentsPage />} />
             <Route path="/assessments/conduct" element={<AssessmentConductPage />} />
             <Route path="/assessments/conduct/:templateId" element={<AssessmentConductPage />} />
