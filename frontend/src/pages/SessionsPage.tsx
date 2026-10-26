@@ -15,11 +15,15 @@ import {
 } from '../utils/sessionMetrics';
 
 function sessionPreview(s: { notesText: string | null; structuredMetrics?: Record<string, unknown> }, isParent: boolean): string | null {
-  const m = s.structuredMetrics ?? {};
-  const parentSummary = String(m.parentSummary ?? '').trim();
-  if (isParent && parentSummary) return parentSummary;
-  if (parentSummary) return parentSummary;
-  return s.notesText?.trim() || null;
+  try {
+    const m = (s.structuredMetrics as Record<string, unknown>) || {};
+    const parentSummary = String(m.parentSummary ?? '').trim();
+    if (isParent && parentSummary) return parentSummary;
+    if (parentSummary) return parentSummary;
+    return s.notesText?.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 export default function SessionsPage() {
@@ -32,6 +36,10 @@ export default function SessionsPage() {
   const [error, setError] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [therapistId, setTherapistId] = useState('');
+  const [therapyType, setTherapyType] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const load = async () => {
     if (!childId) return;
@@ -40,7 +48,7 @@ export default function SessionsPage() {
     try {
       const [c, { sessions: rows }] = await Promise.all([getChild(childId), listSessionsByChild(childId)]);
       setChild(c);
-      setSessions(rows);
+      setSessions(Array.isArray(rows) ? rows : []);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -53,15 +61,83 @@ export default function SessionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery || ''), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   if (loading) return <Spinner />;
   if (error) return <ErrorMessage error={error} onRetry={load} />;
   if (!childId) return null;
 
   const canLog = user?.role === 'admin' || user?.role === 'therapist';
   const isParent = user?.role === 'parent';
-  const filtered = sessions.filter(
-    (s) => (!fromDate || s.sessionDate >= fromDate) && (!toDate || s.sessionDate <= toDate)
-  );
+
+  const therapistOptions: Array<{ id: string; name: string }> = [];
+  try {
+    const map = new Map<string, string>();
+    for (const s of sessions) {
+      const tid = (s as any).therapistUser?.id;
+      const tname = (s as any).therapistUser?.fullName;
+      if (tid && tname) map.set(tid, tname);
+    }
+    for (const [id, name] of Array.from(map.entries())) {
+      therapistOptions.push({ id, name });
+    }
+    therapistOptions.sort((a, b) => a.name.localeCompare(b.name));
+  } catch {}
+
+  const therapyTypeOptions: string[] = [];
+  try {
+    const set = new Set<string>();
+    for (const s of sessions) {
+      const m = ((s as any).structuredMetrics as Record<string, unknown>) || {};
+      const t = ((m.therapyTitle as string | undefined) || (m.therapyType as string | undefined));
+      if (t && String(t).trim()) set.add(String(t).trim());
+    }
+    for (const t of Array.from(set)) therapyTypeOptions.push(t);
+    therapyTypeOptions.sort((a, b) => a.localeCompare(b));
+  } catch {}
+
+  const filtered = sessions.filter((s) => {
+    try {
+      if (fromDate && (s as any).sessionDate < fromDate) return false;
+      if (toDate && (s as any).sessionDate > toDate) return false;
+      if (therapistId) {
+        const tid = (s as any).therapistId || (s as any).therapistUser?.id;
+        if (tid !== therapistId) return false;
+      }
+      if (therapyType) {
+        const m = ((s as any).structuredMetrics as Record<string, unknown>) || {};
+        const t = ((m.therapyTitle as string | undefined) || (m.therapyType as string | undefined) || '').trim();
+        if (t !== therapyType) return false;
+      }
+      if (debouncedSearch && debouncedSearch.trim()) {
+        const q = debouncedSearch.trim().toLowerCase();
+        const m = ((s as any).structuredMetrics as Record<string, unknown>) || {};
+        const title = String(m.sessionTitle || m.title || '').toLowerCase();
+        const notes = String((s as any).notesText || '').toLowerCase();
+        const clinical = String(m.clinicalNotes || m.notesClinical || '').toLowerCase();
+        const therapistNotes = String(m.therapistNotes || '').toLowerCase();
+        const haystack = [title, notes, clinical, therapistNotes].join(' ');
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  });
+
+  const hasActiveFilters = Boolean(fromDate || toDate || therapistId || therapyType || (searchQuery && searchQuery.trim()));
+
+  const clearAllFilters = () => {
+    setFromDate('');
+    setToDate('');
+    setTherapistId('');
+    setTherapyType('');
+    setSearchQuery('');
+    setDebouncedSearch('');
+  };
 
   return (
     <div>
@@ -78,7 +154,7 @@ export default function SessionsPage() {
         Sessions{child ? ` — ${child.firstName} ${child.lastName}` : ''}
       </PageTitle>
 
-      {sessions.length > 0 && (
+      {sessions && sessions.length > 0 && (
         <div className="mb-3 flex flex-wrap items-end gap-2">
           <Field label="From">
             <input type="date" className={inputCls} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -86,15 +162,37 @@ export default function SessionsPage() {
           <Field label="To">
             <input type="date" className={inputCls} value={toDate} onChange={(e) => setToDate(e.target.value)} />
           </Field>
-          {(fromDate || toDate) && (
-            <button
-              type="button"
-              className={btnSecondary}
-              onClick={() => {
-                setFromDate('');
-                setToDate('');
-              }}
-            >
+          <Field label="Therapist">
+            <select className={inputCls} value={therapistId} onChange={(e) => setTherapistId(e.target.value)}>
+              <option value="">All</option>
+              {therapistOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Therapy type">
+            <select className={inputCls} value={therapyType} onChange={(e) => setTherapyType(e.target.value)}>
+              <option value="">All</option>
+              {therapyTypeOptions.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Search">
+            <input
+              type="text"
+              className={inputCls}
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </Field>
+          {hasActiveFilters && (
+            <button type="button" className={btnSecondary} onClick={clearAllFilters}>
               Clear
             </button>
           )}
@@ -102,11 +200,17 @@ export default function SessionsPage() {
       )}
 
       {filtered.length === 0 ? (
-        <EmptyState>{sessions.length === 0 ? 'No sessions logged yet' : 'No sessions in this date range'}</EmptyState>
+        <EmptyState>
+          {sessions && sessions.length === 0
+            ? 'No sessions logged yet'
+            : hasActiveFilters
+            ? 'No sessions match the current filters'
+            : 'No sessions in this date range'}
+        </EmptyState>
       ) : (
         <div className="space-y-2">
-          {filtered.map((s) => {
-            const metrics = s.structuredMetrics ?? {};
+          {filtered.map((s: any) => {
+            const metrics = ((s.structuredMetrics as Record<string, unknown>) || {});
             const therapy = metrics.therapyTitle as string | undefined;
             const timeSlot = metrics.timeSlot as string | undefined;
             return (
